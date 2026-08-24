@@ -1,0 +1,83 @@
+---
+name: loco-infrastructure
+networks:
+  loco:
+    name: loco
+services:
+  registry:
+    container_name: loco-registry
+    environment:
+      REGISTRY_STORAGE_DELETE_ENABLED: 'true'
+    image: registry:2
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.registry.rule=Host(`registry.loco`) && PathPrefix(`/v2`)
+      - traefik.http.routers.registry.priority=10
+      - traefik.http.services.registry.loadbalancer.server.port=5000
+      - traefik.docker.network=loco
+    networks:
+      - loco
+    ports:
+      - 127.0.0.1:5001:5000
+    restart: unless-stopped
+    volumes:
+      - ./var/registry:/var/lib/registry:rw
+  registry-ui:
+    container_name: loco-registry-ui
+    depends_on:
+      - registry
+    environment:
+      DELETE_IMAGES_ENABLED: 'true'
+      DISABLE_USER_FORCE_LOGIN: 'true'
+      NGINX_PROXY_PASS_URL: http://registry:5000
+      REGISTRY_TITLE: Loco Registry
+      REGISTRY_URL: http://registry.loco
+      SHOW_CONTENT_DIGEST: 'true'
+      SINGLE_REGISTRY: 'true'
+    image: joxit/docker-registry-ui:latest
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.registry-ui.rule=Host(`registry.loco`)
+      - traefik.http.services.registry-ui.loadbalancer.server.port=80
+      - traefik.docker.network=loco
+    networks:
+      - loco
+    restart: unless-stopped
+  skillrunner:
+    build: ./skillrunner
+    container_name: loco-skillrunner
+    environment:
+      DOCKER_HOST: unix:///var/run/docker.sock
+      INFRA_DIR: /infra
+      PROJECTS_DIR: /projects
+    networks:
+      - loco
+    ports:
+      - 127.0.0.1:9999:8080
+    restart: unless-stopped
+    volumes:
+      - .:/infra:rw
+      - /var/run/docker.sock:/var/run/docker.sock:rw
+      - ${HOME}/Projects:/projects:rw
+  traefik:
+    command:
+      - '--configFile=/etc/traefik/traefik.yml'
+    container_name: loco-traefik
+    image: traefik:v3
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.dashboard.rule=Host(`traefik.jorpo.loco`)
+      - traefik.http.routers.dashboard.service=api@internal
+      - traefik.http.routers.dashboard.entrypoints=web
+      - traefik.docker.network=loco
+    networks:
+      - loco
+    ports:
+      - 10.254.254.254:80:80
+      - 10.254.254.254:443:443
+      - 127.0.0.1:8080:8080
+    restart: unless-stopped
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./etc/traefik:/etc/traefik:ro
+      - ./var/logs/:/var/log/traefik/:rw
