@@ -1,82 +1,4 @@
 
-# Full setup: install DNS + install skills + pull all images
-install:
-  @echo "═══ Installing Loco Infra ═══"
-  @echo ""
-  @echo "── DNS ──"
-  @{{ SCRIPTS_DIR }}/dns.sh install
-  @echo ""
-  @echo "── Skills ──"
-  @mkdir -p {{ env("HOME") }}/.pi/skills
-  @for skill in {{ PROJECT_DIR }}/skills/*/; do \
-    name=$$(basename "$$skill"); \
-    target={{ env("HOME") }}/.pi/skills/$$name; \
-    if [ -L "$$target" ]; then \
-      echo "  ✓ $$name already linked"; \
-    elif [ -d "$$target" ]; then \
-      echo "  ⚠ $$name exists as directory — skipping"; \
-    else \
-      ln -s "$$skill" "$$target"; \
-      echo "  ✓ Linked: ~/.pi/skills/$$name → $$skill"; \
-    fi; \
-  done
-  @echo ""
-  @echo "── Images ──"
-  @docker compose pull 2>&1 | sed 's/^/  /'
-  @echo ""
-  @echo "═══ Install complete ═══"
-  @echo "  Run 'just up' to start the stack."
-
-
-# Full uninstall: remove DNS + unlink skills + stop stack
-uninstall:
-  @echo "═══ Uninstalling Loco Infra ═══"
-  @echo ""
-  @echo "── DNS ──"
-  @{{ SCRIPTS_DIR }}/dns.sh uninstall
-  @echo ""
-  @echo "── Stop stack ──"
-  @{{ SCRIPTS_DIR }}/infra.sh down 2>/dev/null || echo "  (nothing running)"
-  @echo ""
-  @echo "── Unlink skills ──"
-  @for skill in {{ PROJECT_DIR }}/skills/*/; do \
-    name=$$(basename "$$skill"); \
-    target={{ env("HOME") }}/.pi/skills/$$name; \
-    if [ -L "$$target" ]; then \
-      rm "$$target"; \
-      echo "  ✓ Unlinked ~/.pi/skills/$$name"; \
-    else \
-      echo "  - ~/.pi/skills/$$name not a symlink — skipped"; \
-    fi; \
-  done
-  @echo ""
-  @echo "═══ Uninstall complete ═══"
-  @echo "  Run 'just install' to reinstall."
-
-# ──────────────────────────────────────────────
-# Infra Stack
-# ──────────────────────────────────────────────
-
-# Start everything (Traefik + Registry + Registry UI + Dockge)
-up:
-  @{{ SCRIPTS_DIR }}/infra.sh up
-
-# Stop everything
-down:
-  @{{ SCRIPTS_DIR }}/infra.sh down
-
-# Show stack status
-status:
-  @{{ SCRIPTS_DIR }}/infra.sh status
-
-# Tail logs
-logs:
-  @{{ SCRIPTS_DIR }}/infra.sh logs
-
-# Restart everything
-restart:
-  @{{ SCRIPTS_DIR }}/infra.sh restart
-
 # ──────────────────────────────────────────────
 # Registry
 # ──────────────────────────────────────────────
@@ -95,24 +17,6 @@ registry-list:
 registry-clean:
   @{{ SCRIPTS_DIR }}/registry.sh clean
 
-# ──────────────────────────────────────────────
-# Web UIs
-# ──────────────────────────────────────────────
-
-# Open the registry UI in your browser
-registry-ui:
-  @echo "Opening http://registry.loco..."
-  @open http://registry.loco
-
-# Open Dockge in your browser
-dockge:
-  @echo "Opening http://dockge.jorpo.loco..."
-  @open http://dockge.jorpo.loco
-
-# Open Traefik dashboard in your browser
-traefik:
-  @echo "Opening http://traefik.jorpo.loco..."
-  @open http://traefik.jorpo.loco
 
 # ──────────────────────────────────────────────
 # Scaffolding

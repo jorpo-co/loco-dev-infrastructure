@@ -102,10 +102,6 @@ cmd_status() {
   fi
 }
 
-cmd_logs() {
-  (cd "$PROJECT_DIR" && docker compose logs -f)
-}
-
 cmd_restart() {
   cmd_down
   echo ""
@@ -123,7 +119,6 @@ usage() {
   echo "  up        Start the stack (idempotent)"
   echo "  down      Stop the stack"
   echo "  status    Show stack status"
-  echo "  logs      Tail logs"
   echo "  restart   Restart the stack"
   exit 1
 }
@@ -140,7 +135,6 @@ main() {
     up)      cmd_up "$@" ;;
     down)    cmd_down "$@" ;;
     status)  cmd_status "$@" ;;
-    logs)    cmd_logs "$@" ;;
     restart) cmd_restart "$@" ;;
     *)       usage ;;
   esac

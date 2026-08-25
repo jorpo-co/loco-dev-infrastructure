@@ -1,9 +1,11 @@
 #!/usr/bin/env bash
-# scripts/scaffold.sh — Scaffold new projects with proper compose.yaml + Traefik labels
+# scripts/scaffold.sh — Register new projects with the infra Traefik router
+#
+# Uses the file provider (etc/traefik/services/*.yml) instead of Docker labels.
+# All types — compose, kind, site — use Traefik config stored in infra.
 #
 # Usage:
 #   scripts/scaffold.sh compose <name> [port] [category]
-#   scripts/scaffold.sh kind <name> [category]
 #   scripts/scaffold.sh site <name> [port]
 
 set -euo pipefail
@@ -25,10 +27,8 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 if [ -n "$infra_dir" ]; then
   PROJECT_DIR="$infra_dir"
 elif [[ "$SCRIPT_DIR" == */infra/scripts* ]] || [[ "$SCRIPT_DIR" == */_infra/scripts* ]]; then
-  # Running from the skillrunner container (mounted at /infra) or from _infra on host
   PROJECT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 else
-  # Fallback: assume relative to script location
   PROJECT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 fi
 
@@ -42,6 +42,7 @@ fi
 
 TEMPLATE_DIR="${PROJECT_DIR}/${TEMPLATES_RELPATH:-templates}"
 PROJECTS_DIR="${PROJECTS_DIR:-${HOME}/Projects}"
+TRAEFIK_CONFIG_DIR="${PROJECT_DIR}/${TRAEFIK_CONFIG_SUBDIR:-etc/traefik/services}"
 
 # ──────────────────────────────────────────────
 # Compose project
@@ -75,7 +76,6 @@ cmd_compose() {
   if [ -z "$category" ]; then
     local current_dir
     current_dir=$(pwd)
-    # Check if we're inside a category folder under ~/Projects/
     if [[ "$current_dir" == "$PROJECTS_DIR"/* ]]; then
       category=$(echo "$current_dir" | sed "s|${PROJECTS_DIR}/||" | cut -d'/' -f1)
     else
@@ -85,148 +85,69 @@ cmd_compose() {
     fi
   fi
 
-  # project_dir is the global var set by --project-dir flag.
-  # If not already set, construct it from PROJECTS_DIR + category + name.
-  if [ -z "$project_dir" ]; then
-    project_dir="${PROJECTS_DIR}/${category}/${name}"
-  fi
-  local compose_file="${project_dir}/compose.yaml"
+  local traefik_file="${TRAEFIK_CONFIG_DIR}/${name}.yml"
 
-  echo "═══ Scaffolding Compose Project: ${name} ═══"
+  echo "═══ Registering Compose Project: ${name} ═══"
   echo ""
 
   # Check if already exists
-  if [ -f "$compose_file" ]; then
-    echo "  ✗ compose.yaml already exists at ${compose_file}"
+  if [ -f "$traefik_file" ]; then
+    echo "  ✗ Traefik config already exists at ${traefik_file}"
     exit 1
   fi
 
-  # Create project directory
-  mkdir -p "$project_dir"
+  mkdir -p "$TRAEFIK_CONFIG_DIR"
 
-  # Generate compose.yaml from template
-  if [ -f "${TEMPLATE_DIR}/compose.yml" ]; then
-    cat "${TEMPLATE_DIR}/compose.yml" \
-      | sed "s/{{project_name}}/${name}/g" \
+  # Generate Traefik file provider config from template
+  if [ -f "${TEMPLATE_DIR}/compose-traefik.yml" ]; then
+    cat "${TEMPLATE_DIR}/compose-traefik.yml" \
+      | sed "s/{{name}}/${name}/g" \
+      | sed "s/{{host}}/${name}/g" \
       | sed "s/{{port}}/${port}/g" \
-      > "$compose_file"
-    echo "  ✓ Created: ${compose_file}"
+      | sed "s/{{domain_suffix}}/.jorpo.loco/g" \
+      > "$traefik_file"
+    echo "  ✓ Created: ${traefik_file}"
   else
-    echo "  ✗ Template not found at ${TEMPLATE_DIR}/compose.yml"
-    echo "  Creating minimal compose.yaml..."
-    cat > "$compose_file" <<YAML
-services:
-  ${name}:
-    build: .
-    networks:
-      - loco-net
-    labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.${name}.rule=Host(\`${name}.jorpo.loco\`)"
-      - "traefik.http.routers.${name}.entrypoints=web"
-      - "traefik.http.services.${name}.loadbalancer.server.port=${port}"
-      - "traefik.docker.network=loco-net"
-
-networks:
-  loco-net:
-    external: true
+    echo "  ✗ Template not found at ${TEMPLATE_DIR}/compose-traefik.yml"
+    cat > "$traefik_file" <<YAML
+http:
+  routers:
+    ${name}:
+      rule: "HostRegexp(\`{subdomain:.+}.${name}.jorpo.loco\`) || Host(\`${name}.jorpo.loco\`)"
+      entryPoints: ["web"]
+      service: ${name}
+    ${name}-secure:
+      rule: "HostRegexp(\`{subdomain:.+}.${name}.jorpo.loco\`) || Host(\`${name}.jorpo.loco\`)"
+      entryPoints: ["websecure"]
+      service: ${name}
+      tls: {}
+  services:
+    ${name}:
+      loadBalancer:
+        servers:
+          - url: "http://${name}:${port}"
 YAML
-    echo "  ✓ Created (minimal): ${compose_file}"
-  fi
-
-  # Create .gitignore
-  if [ ! -f "${project_dir}/.gitignore" ]; then
-    cat > "${project_dir}/.gitignore" <<EOF
-.DS_Store
-node_modules/
-vendor/
-.env
-*.log
-EOF
-    echo "  ✓ Created: ${project_dir}/.gitignore"
+    echo "  ✓ Created (minimal): ${traefik_file}"
   fi
 
   echo ""
-  echo "═══ Project '${name}' scaffolded ═══"
-  echo "  Location: ${project_dir}"
+  echo "═══ Project '${name}' registered ═══"
   echo "  Domain:   http://${name}.jorpo.loco"
-  echo "  Start:    cd ${project_dir} && docker compose up -d"
+  echo "  Traefik:  ${traefik_file}"
+  echo ""
+  echo "  ── Next steps ──"
+  echo "  1. Add to your project's compose.yaml:"
+  echo "       networks:"
+  echo "         - loco"
+  echo "  2. Add the external network:"
+  echo "       networks:"
+  echo "         loco:"
+  echo "           external: true"
+  echo "  3. Ensure your container is named '${name}' or use container_name: ${name}"
+  echo "  4. Start: docker compose up -d"
 }
 
-# ──────────────────────────────────────────────
-# Kind project
-# ──────────────────────────────────────────────
 
-cmd_kind() {
-  local name="" category=""
-
-  if [ -n "$project_dir" ]; then
-    name="$(basename "$project_dir")"
-    category="$(basename "$(dirname "$project_dir")")"
-  else
-    if [ $# -lt 1 ]; then
-      echo "Usage: $(basename "$0") kind <name> [category]"
-      echo "  name      Cluster name (also becomes the domain: *.name.jorpo.loco)"
-      echo "  category  Subfolder under ~/Projects/ (default: inferred from PWD)"
-      echo ""
-      echo "Or with --project-dir (flags before subcommand):"
-      echo "  $(basename "$0") --project-dir /projects/<category>/<name> kind"
-      exit 1
-    fi
-    name="$1"
-    category="${2:-}"
-
-    # Determine category
-    if [ -z "$category" ]; then
-      local current_dir
-      current_dir=$(pwd)
-      if [[ "$current_dir" == "$PROJECTS_DIR"/* ]]; then
-        category=$(echo "$current_dir" | sed "s|${PROJECTS_DIR}/||" | cut -d'/' -f1)
-      else
-        echo "  Could not determine category. Specify it or run from ~/Projects/<category>/"
-        echo "  Usage: $(basename "$0") kind <name> [category]"
-        exit 1
-      fi
-    fi
-
-    project_dir="${PROJECTS_DIR}/${category}/${name}"
-  fi
-
-  local kind_config="${project_dir}/kind-config.yaml"
-
-  echo "═══ Scaffolding Kind Project: ${name} ═══"
-  echo ""
-
-  # Check if already exists
-  if [ -f "$kind_config" ]; then
-    echo "  ✗ kind-config.yaml already exists at ${kind_config}"
-    exit 1
-  fi
-
-  # Create project directory
-  mkdir -p "$project_dir"
-
-  # Generate kind-config.yaml from template
-  if [ -f "${TEMPLATE_DIR}/kind-config.yaml" ]; then
-    # We can't fill ports yet — those are allocated at creation time
-    # Write a placeholder and let the user run 'just kind-create'
-    cat "${TEMPLATE_DIR}/kind-config.yaml" \
-      | sed "s/{{cluster_name}}/${name}/g" \
-      | sed "s/{{http_port}}/{{http_port}}/g" \
-      | sed "s/{{tls_port}}/{{tls_port}}/g" \
-      > "$kind_config"
-    echo "  ✓ Created: ${kind_config}"
-  else
-    echo "  ✗ Template not found at ${TEMPLATE_DIR}/kind-config.yaml"
-    exit 1
-  fi
-
-  echo ""
-  echo "═══ Kind project '${name}' scaffolded ═══"
-  echo "  Location: ${project_dir}"
-  echo "  Domain:   *.${name}.jorpo.loco"
-  echo "  Next:     cd ${project_dir} && just kind-create ${name}  (from _infra/)"
-}
 
 # ──────────────────────────────────────────────
 # Site project
@@ -250,48 +171,67 @@ cmd_site() {
     fi
     name="$1"
     port="${2:-80}"
-    project_dir="${PROJECTS_DIR}/sites/${name}"
   fi
 
-  local compose_file="${project_dir}/compose.yaml"
+  local traefik_file="${TRAEFIK_CONFIG_DIR}/${name}.yml"
 
-  echo "═══ Scaffolding Site: ${name} ═══"
+  echo "═══ Registering Site: ${name} ═══"
   echo ""
 
   # Check if already exists
-  if [ -f "$compose_file" ]; then
-    echo "  ✗ compose.yaml already exists at ${compose_file}"
+  if [ -f "$traefik_file" ]; then
+    echo "  ✗ Traefik config already exists at ${traefik_file}"
     exit 1
   fi
 
-  # Create project directory
-  mkdir -p "$project_dir"
+  mkdir -p "$TRAEFIK_CONFIG_DIR"
 
-  # Generate compose.yaml
-  cat > "$compose_file" <<YAML
-services:
-  ${name}:
-    build: .
-    networks:
-      - ${LOCO_NETWORK_NAME:-loco}
-    labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.${name}.rule=Host(\`${name}.loco\`)"
-      - "traefik.http.routers.${name}.entrypoints=web"
-      - "traefik.http.services.${name}.loadbalancer.server.port=${port}"
-      - "traefik.docker.network=${LOCO_NETWORK_NAME:-loco}"
-
-networks:
-  ${LOCO_NETWORK_NAME:-loco}:
-    external: true
+  # Generate Traefik file provider config from template
+  if [ -f "${TEMPLATE_DIR}/compose-traefik.yml" ]; then
+    cat "${TEMPLATE_DIR}/compose-traefik.yml" \
+      | sed "s/{{name}}/${name}/g" \
+      | sed "s/{{host}}/${name}/g" \
+      | sed "s/{{port}}/${port}/g" \
+      | sed "s/{{domain_suffix}}/.loco/g" \
+      > "$traefik_file"
+    echo "  ✓ Created: ${traefik_file}"
+  else
+    cat > "$traefik_file" <<YAML
+http:
+  routers:
+    ${name}:
+      rule: "HostRegexp(\`{subdomain:.+}.${name}.loco\`) || Host(\`${name}.loco\`)"
+      entryPoints: ["web"]
+      service: ${name}
+    ${name}-secure:
+      rule: "HostRegexp(\`{subdomain:.+}.${name}.loco\`) || Host(\`${name}.loco\`)"
+      entryPoints: ["websecure"]
+      service: ${name}
+      tls: {}
+  services:
+    ${name}:
+      loadBalancer:
+        servers:
+          - url: "http://${name}:${port}"
 YAML
-  echo "  ✓ Created: ${compose_file}"
+    echo "  ✓ Created (minimal): ${traefik_file}"
+  fi
 
   echo ""
-  echo "═══ Site '${name}' scaffolded ═══"
-  echo "  Location: ${project_dir}"
+  echo "═══ Site '${name}' registered ═══"
   echo "  Domain:   http://${name}.loco"
-  echo "  Start:    cd ${project_dir} && docker compose up -d"
+  echo "  Traefik:  ${traefik_file}"
+  echo ""
+  echo "  ── Next steps ──"
+  echo "  1. Add to your site's compose.yaml:"
+  echo "       networks:"
+  echo "         - loco"
+  echo "  2. Add the external network:"
+  echo "       networks:"
+  echo "         loco:"
+  echo "           external: true"
+  echo "  3. Ensure your container is named '${name}' or use container_name: ${name}"
+  echo "  4. Start: docker compose up -d"
 }
 
 # ──────────────────────────────────────────────
@@ -302,9 +242,11 @@ usage() {
   echo "Usage: $(basename "$0") <command> [args]"
   echo ""
   echo "Commands:"
-  echo "  compose <name> [port] [category]    Scaffold a Docker Compose project"
-  echo "  kind <name> [category]              Scaffold a kind cluster project"
-  echo "  site <name> [port]                  Scaffold a site project (uses .loco TLD)"
+  echo "  compose <name> [port] [category]    Register a Docker Compose project with Traefik"
+  echo "  site <name> [port]                  Register a site project (uses .loco TLD) with Traefik"
+  echo ""
+  echo "All types use Traefik file provider config stored in etc/traefik/services/."
+  echo "No Docker labels or loco.compose.yaml files are generated."
   exit 1
 }
 
@@ -318,7 +260,6 @@ main() {
 
   case "${cmd}" in
     compose) cmd_compose "$@" ;;
-    kind)    cmd_kind "$@" ;;
     site)    cmd_site "$@" ;;
     *)       usage ;;
   esac

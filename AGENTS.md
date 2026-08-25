@@ -1,76 +1,77 @@
 # Agents & Skills
 
 AI agents (pi) interact with the Loco Infra stack via **three installable skills** and the
-**skillrunner API server** (`loco-skillrunner`, port 9999), which runs inside the stack and
-provides all tooling (docker CLI, kind, kubectl).
+**skillrunner API server** (`loco-skillrunner`, port 9999), which runs inside the stack.
 
 ## Installation
 
 ```bash
-cd ~/Projects/_infra && just install-skills
+cd ~/Projects/_infra && just install
 ```
 
-Symlinks `skills/loco-{infra,project,kind}` → `~/.pi/skills/`.
+Symlinks `skills/loco-{infra,project,kind}` → `~/.pi/skills/`, installs DNS, pulls images.
 
 ## The skillrunner API
-
-All management commands go through a single HTTP endpoint:
 
 ```
 POST http://localhost:9999/run
 Content-Type: application/json
 
+# Recipe mode (preferred — runs just recipes):
+{"recipe": "<recipe-name>", "args": ["<arg1>", ...]}
+
+# Script mode (for arbitrary commands):
 {"script": "/infra/scripts/<script>.sh", "args": ["<arg1>", ...]}
 
 → {"exit_code": 0, "stdout": "...", "stderr": "..."}
 ```
 
-The container mounts:
-
-| Mount | Inside container | Purpose |
-|---|---|---|
-| `~/Projects/_infra` → | `/infra` | Scripts, templates, Traefik configs, port state |
-| `~/Projects/` → | `/projects` | All user projects (read/write) |
-| Docker socket → | `/var/run/docker.sock` | Control host Docker |
+Container mounts: `/infra` ← `~/Projects/_infra`, `/projects` ← `~/Projects/`.
 
 ## Skills
 
 ### loco-infra — Infrastructure lifecycle
 
 ```bash
-curl -s -X POST http://localhost:9999/run -d '{"script":"/infra/scripts/infra.sh","args":["up"]}'
-curl -s -X POST http://localhost:9999/run -d '{"script":"/infra/scripts/infra.sh","args":["status"]}'
-curl -s -X POST http://localhost:9999/run -d '{"script":"/infra/scripts/infra.sh","args":["down"]}'
-curl -s -X POST http://localhost:9999/run -d '{"script":"/infra/scripts/infra.sh","args":["logs"]}'
-curl -s -X POST http://localhost:9999/run -d '{"script":"/infra/scripts/registry.sh","args":["list"]}'
+curl -s -X POST http://localhost:9999/run -d '{"recipe":"up"}'
+curl -s -X POST http://localhost:9999/run -d '{"recipe":"down"}'
+curl -s -X POST http://localhost:9999/run -d '{"recipe":"status"}'
+curl -s -X POST http://localhost:9999/run -d '{"recipe":"doctor"}'
+curl -s -X POST http://localhost:9999/run -d '{"recipe":"registry-list"}'
 ```
 
-DNS is host-only (needs sudo + brew): use `just dns-install` from `_infra/`.
+DNS is host-only (needs sudo + brew): `cd ~/Projects/_infra && just dns-status`.
 
-### loco-project — Scaffold projects
+### loco-project — Register projects with Traefik
 
-Agent resolves project directory from user prompt, then:
+Writes a Traefik file provider config to `etc/traefik/services/<name>.yml` (no loco.compose.yaml).
+All types use the file provider — no Docker labels.
 
 ```bash
-curl -s -X POST http://localhost:9999/run \
-  -d '{"script":"/infra/scripts/scaffold.sh","args":["--project-dir","/projects/jorpo/myapp","compose","3000"]}'
-
-curl -s -X POST http://localhost:9999/run \
-  -d '{"script":"/infra/scripts/scaffold.sh","args":["--project-dir","/projects/sites/blog","site","80"]}'
-
-curl -s -X POST http://localhost:9999/run \
-  -d '{"script":"/infra/scripts/scaffold.sh","args":["--project-dir","/projects/jorpo/mycluster","kind"]}'
+curl -s -X POST http://localhost:9999/run -d '{"recipe":"scaffold-compose","args":["myapp","3000"]}'
+curl -s -X POST http://localhost:9999/run -d '{"recipe":"scaffold-site","args":["blog","80"]}'
 ```
+
+The agent resolves the project directory from the user's prompt and ensures CWD is set
+appropriately for category inference.
 
 ### loco-kind — Kind cluster management
 
+Kind clusters also use the Traefik file provider, but route via `host.docker.internal`
+(since they're on a separate bridge network, not `loco`).
+
 ```bash
-curl -s -X POST http://localhost:9999/run -d '{"script":"/infra/scripts/kind.sh","args":["create","mycluster"]}'
-curl -s -X POST http://localhost:9999/run -d '{"script":"/infra/scripts/kind.sh","args":["delete","mycluster"]}'
-curl -s -X POST http://localhost:9999/run -d '{"script":"/infra/scripts/kind.sh","args":["list"]}'
+curl -s -X POST http://localhost:9999/run -d '{"recipe":"scaffold-kind","args":["mycluster"]}'
+curl -s -X POST http://localhost:9999/run -d '{"recipe":"kind-create","args":["mycluster"]}'
+curl -s -X POST http://localhost:9999/run -d '{"recipe":"kind-import","args":["mycluster"]}'
+curl -s -X POST http://localhost:9999/run -d '{"recipe":"kind-delete","args":["mycluster"]}'
+curl -s -X POST http://localhost:9999/run -d '{"recipe":"kind-list"}'
 ```
 
-Ports auto-allocated (30080+N), Traefik config written to `/infra/etc/traefik/services/`.
+`scaffold-kind` generates `kind-config.yaml` for a new cluster project. Ports are placeholders — allocated at creation time.
+
+`kind-import` registers an **existing** cluster (created manually or by other tools) with
+the infra Traefik router — allocates ports, writes config, configures containerd mirror.
 
 ## Troubleshooting
 
@@ -79,9 +80,8 @@ Ports auto-allocated (30080+N), Traefik config written to `/infra/etc/traefik/se
 | Skillrunner not responding | `curl -s http://localhost:9999/health` |
 | DNS not resolving | `cd ~/Projects/_infra && just dns-status` |
 | Traefik not routing | Check http://traefik.jorpo.loco dashboard |
-| Kind cluster issues | `curl ... -d '{"script":"/usr/local/bin/kind","args":["get","clusters"]}'` |
-| General health | `curl ... -d '{"script":"/usr/bin/docker","args":["ps","--filter","network=loco"]}'` |
+| Kind cluster issues | `{"recipe":"kind-list"}` or `{"script":"/usr/local/bin/kind","args":["get","clusters"]}` |
 
 ## Full reference
 
-`README.md` in this directory for architecture, templates, registry, and bootstrap.
+`README.md` in _infra for architecture, templates, registry, and bootstrap.

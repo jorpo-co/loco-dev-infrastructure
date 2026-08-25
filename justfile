@@ -1,4 +1,3 @@
-
 set unstable
 set lists
 
@@ -14,33 +13,36 @@ default:
 # install requirements
 setup:
   @{{ SCRIPTS_DIR }}/dns.sh install
-  @docker compose -f compose.yml pull --ignore-pull-failures --include-deps --policy missing
-
+  @docker compose -f compose.yml pull \
+    --ignore-pull-failures \
+    --include-deps \
+    --policy missing
+  @{{ SCRIPTS_DIR }}/skills.sh install
 
 # remove installed components
 teardown:
+  @{{ SCRIPTS_DIR }}/skills.sh uninstall
+  @docker compose -f compose.yml down \
+    --rmi all
   @{{ SCRIPTS_DIR }}/dns.sh uninstall
-
 
 # start the infrastructure
 up:
   @{{ SCRIPTS_DIR }}/infra.sh up
 
-
 # bring the infrastructure down
 down:
   @{{ SCRIPTS_DIR }}/infra.sh down
 
-
 # status of system
-status: _status_dns
-
-_status_dns:
+status:
   @{{ SCRIPTS_DIR }}/dns.sh status
-
-_status_infra:
   @{{ SCRIPTS_DIR }}/infra.sh status
+  @{{ SCRIPTS_DIR }}/skills.sh status
 
+# restart the stack
+restart:
+  @{{ SCRIPTS_DIR }}/infra.sh restart
 
 # show docker cpmpose logs and follow output
 logs:
@@ -56,3 +58,121 @@ registry:
 traefik:
   @echo "Opening http://traefik.jorpo.loco..."
   @open http://traefik.jorpo.loco
+
+
+
+
+# tag and push an image to registry.loco
+registry-push image tag="latest":
+  @{{ SCRIPTS_DIR }}/registry.sh push "{{ image }}" "{{ tag }}"
+  @echo "  → http://registry.loco"
+
+# list repositories in the registry
+registry-list:
+  @{{ SCRIPTS_DIR }}/registry.sh list
+
+# show registry garbage collection info
+registry-clean:
+  @{{ SCRIPTS_DIR }}/registry.sh clean
+
+
+# register a compose project with Traefik (file provider, no loco.compose.yaml)
+scaffold-compose name port="3000":
+  @{{ SCRIPTS_DIR }}/scaffold.sh compose "{{ name }}" "{{ port }}"
+
+# scaffold a kind cluster project
+scaffold-kind name:
+  @{{ SCRIPTS_DIR }}/kind.sh scaffold "{{ name }}"
+
+# register a site project with Traefik (file provider, .loco TLD)
+scaffold-site name port="80":
+  @{{ SCRIPTS_DIR }}/scaffold.sh site "{{ name }}" "{{ port }}"
+
+
+# create a kind cluster with port allocation + Traefik config
+kind-create name:
+  @{{ SCRIPTS_DIR }}/kind.sh create "{{ name }}"
+
+# delete a kind cluster and free its ports
+kind-delete name:
+  @{{ SCRIPTS_DIR }}/kind.sh delete "{{ name }}"
+
+# register an existing kind cluster with infra (ports + Traefik config + mirror)
+kind-import name:
+  @{{ SCRIPTS_DIR }}/kind.sh import "{{ name }}"
+
+# list all kind clusters with port mappings
+kind-list:
+  @{{ SCRIPTS_DIR }}/kind.sh list
+
+# show port allocations
+kind-ports:
+  @{{ SCRIPTS_DIR }}/kind.sh ports
+
+
+# show all running projects on the infra network
+ps:
+  @echo "══════════════════════════════════════════════"
+  @echo "  Docker Compose (loco)"
+  @echo "══════════════════════════════════════════════"
+  @docker ps --filter "network=loco" --format "table {{.Names}}\t{{.Image}}\t{{.Status}}" 2>/dev/null || echo "  (no containers)"
+  @echo ""
+  @echo "══════════════════════════════════════════════"
+  @echo "  Kind Clusters"
+  @echo "══════════════════════════════════════════════"
+  @kind get clusters 2>/dev/null || echo "  (no clusters)"
+  @echo ""
+  @echo "══════════════════════════════════════════════"
+  @echo "  Traefik File Provider Configs"
+  @echo "══════════════════════════════════════════════"
+  @ls -1 {{ PROJECT_DIR }}/etc/traefik/services/*.yml 2>/dev/null | sed 's/^/  /' || echo "  (none)"
+  @echo ""
+  @echo "══════════════════════════════════════════════"
+  @echo "  Port Allocations"
+  @echo "══════════════════════════════════════════════"
+  @{{ SCRIPTS_DIR }}/kind.sh ports 2>/dev/null || echo "  (none)"
+
+
+# check all components are healthy
+doctor:
+  @echo "═══ Loco Infra Doctor ═══"
+  @echo ""
+  @echo "── Docker ──"
+  @if docker info &>/dev/null; then echo "  ✓ Docker is running"; else echo "  ✗ Docker is not running"; fi
+  @echo ""
+  @echo "── DNS ──"
+  @if dscacheutil -q host -a name test.jorpo.loco 2>/dev/null | grep -q "10.254.254.254"; then echo "  ✓ *.jorpo.loco → 10.254.254.254"; else echo "  ✗ *.jorpo.loco not resolving. Run: just setup"; fi
+  @if dscacheutil -q host -a name test.loco 2>/dev/null | grep -q "10.254.254.254"; then echo "  ✓ *.loco → 10.254.254.254"; else echo "  ✗ *.loco not resolving. Run: just setup"; fi
+  @echo ""
+  @echo "── Infrastructure ──"
+  @for svc in loco-traefik loco-registry loco-registry-ui loco-skillrunner; do \
+    docker ps --format "{{.Names}}" 2>/dev/null | grep -q "$$svc" && echo "  ✓ $$svc is running" || echo "  ✗ $$svc is not running. Run: just up"; \
+  done
+  @echo ""
+  @echo "── Traefik Routing ──"
+  @if curl -s -o /dev/null -w "%{http_code}" http://traefik.jorpo.loco 2>/dev/null | grep -q "200"; then echo "  ✓ Traefik dashboard reachable at http://traefik.jorpo.loco"; else echo "  ⚠ Traefik dashboard not reachable (may need DNS setup)"; fi
+  @echo ""
+  @echo "── /etc/hosts conflicts ──"
+  @if grep -q "jorpo.loco" /etc/hosts 2>/dev/null; then echo "  ⚠ /etc/hosts contains jorpo.loco entries — may conflict with dnsmasq"; grep "jorpo.loco" /etc/hosts 2>/dev/null | sed 's/^/    /'; else echo "  ✓ No jorpo.loco entries in /etc/hosts"; fi
+  @echo ""
+  @echo "═══ Doctor complete ═══"
+
+
+# show environment variables and paths
+env:
+  @echo "═══ Loco Infra Environment ═══"
+  @echo ""
+  @echo "  Project dir:  {{ PROJECT_DIR }}"
+  @echo "  Scripts dir:  {{ SCRIPTS_DIR }}"
+  @echo "  Compose file: {{ PROJECT_DIR }}/compose.yml"
+  @echo "  Traefik cfg:  {{ PROJECT_DIR }}/etc/traefik/traefik.yml"
+  @echo "  Providers:    {{ PROJECT_DIR }}/etc/traefik/services/"
+  @echo "  Templates:    {{ PROJECT_DIR }}/templates/"
+  @echo "  Registry:     {{ PROJECT_DIR }}/var/registry/"
+  @echo "  Port allocs:  {{ PROJECT_DIR }}/var/port-allocations.json"
+  @echo "  Skills:       {{ PROJECT_DIR }}/skills/"
+  @echo ""
+  @echo "  DNS:          *.jorpo.loco, *.loco → 10.254.254.254"
+  @echo "  Traefik:      http://traefik.jorpo.loco"
+  @echo "  Registry:     http://registry.loco / localhost:5001"
+  @echo "  Skillrunner:  http://localhost:9999"

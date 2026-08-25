@@ -280,87 +280,87 @@ just restart  # docker compose restart
 
 ### The Pattern
 
-Every project that needs networking gets a `compose.yaml` that:
+All project types — compose, kind, and site — use the **Traefik file provider** for routing.
+Config files live in `etc/traefik/services/` inside the infra stack. No Docker labels needed.
 
-1. Joins the external `loco-net` network
-2. Adds Traefik labels to each service that needs to be reachable
-3. Sets `traefik.docker.network=loco-net` so Traefik knows which network to route through
+Every project that needs networking:
 
-### Template
+1. Joins the external `loco` network (adds `networks: [loco]` to its own `compose.yaml`)
+2. The scaffold step writes a Traefik file provider config to `etc/traefik/services/<name>.yml`
+3. No `loco.compose.yaml` files, no Traefik labels
+
+### Traefik File Provider Config
+
+Written by `just scaffold-compose <name> <port>`:
 
 ```yaml
-# ~/Projects/<category>/<project>/compose.yaml
-services:
-  app:
-    build: .
-    networks:
-      - loco-net
-    labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.{{project_name}}.rule=Host(`{{project_name}}.jorpo.loco`)"
-      - "traefik.http.routers.{{project_name}}.entrypoints=web"
-      - "traefik.http.services.{{project_name}}.loadbalancer.server.port={{port}}"
-      - "traefik.docker.network=loco-net"
-
-networks:
-  loco-net:
-    external: true
+# _infra/etc/traefik/services/myapp.yml
+http:
+  routers:
+    myapp:
+      rule: "HostRegexp(`{subdomain:.+}.myapp.jorpo.loco`) || Host(`myapp.jorpo.loco`)"
+      entryPoints: ["web"]
+      service: myapp
+    myapp-secure:
+      rule: "HostRegexp(`{subdomain:.+}.myapp.jorpo.loco`) || Host(`myapp.jorpo.loco`)"
+      entryPoints: ["websecure"]
+      service: myapp
+      tls: {}
+  services:
+    myapp:
+      loadBalancer:
+        servers:
+          - url: "http://myapp:3000"
 ```
 
-### Example: concerto
+This gives both `myapp.jorpo.loco` and `*.myapp.jorpo.loco` (e.g. `api.myapp.jorpo.loco`).
+
+### Example: concerto (`compose.yaml`)
+
+The project's own compose file only needs network attachment — no labels:
 
 ```yaml
 # ~/Projects/jorpo/concerto/compose.yaml
 services:
   app:
     build: .
+    container_name: concerto
     networks:
-      - loco-net
-    labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.concerto.rule=Host(`concerto.jorpo.loco`)"
-      - "traefik.http.routers.concerto.entrypoints=web"
-      - "traefik.http.services.concerto.loadbalancer.server.port=3000"
-      - "traefik.docker.network=loco-net"
+      - loco
 
   db:
     image: postgres:16
     networks:
-      - loco-net
-    # no Traefik labels — db is internal only
+      - loco
+    # db is internal only — no Traefik route needed
 
 networks:
-  loco-net:
+  loco:
     external: true
 ```
 
-### Example: jorpo website (root domain)
+### Example: jorpo website (root domain, site project)
 
 ```yaml
 # ~/Projects/sites/jorpo-website/compose.yaml
 services:
   web:
     build: .
+    container_name: jorpo-website
     networks:
-      - loco-net
-    labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.jorpo.rule=Host(`jorpo.loco`)"
-      - "traefik.http.routers.jorpo.entrypoints=web"
-      - "traefik.http.services.jorpo.loadbalancer.server.port=80"
-      - "traefik.docker.network=loco-net"
+      - loco
 
 networks:
-  loco-net:
+  loco:
     external: true
 ```
 
 ### How Discovery Works
 
-1. Traefik watches the Docker socket for containers on `loco-net`
-2. When a container with `traefik.enable=true` appears, Traefik reads its labels
-3. Traefik creates a route for the `Host()` rule pointing to the container's port
-4. No Traefik config file needed — it's fully automatic
+1. `just scaffold-compose <name> <port>` writes a file provider config to `etc/traefik/services/<name>.yml`
+2. Traefik watches this directory and loads the route dynamically
+3. The project container joins the `loco` network via its own `compose.yaml`
+4. Docker DNS resolves the container name on `loco` — no labels needed
 
 ---
 
@@ -368,7 +368,10 @@ networks:
 
 ### Why File Provider
 
-Kind clusters run on the `kind` Docker bridge network, not `loco-net`. They can't use Docker labels. Instead, each kind cluster gets a config file in `traefik/config/` that tells Traefik how to route to it.
+Kind clusters run on the `kind` Docker bridge network, not `loco`. They can't reach Traefik
+via Docker DNS. Instead, each kind cluster gets a config file in `etc/traefik/services/`
+that routes to `host.docker.internal:<http_port>`. Composer projects use the same file
+provider approach but route via Docker DNS on the `loco` network.
 
 ### Flow
 
@@ -507,31 +510,51 @@ just registry-clean                  # garbage collect (if supported)
 
 ## 8. Project Templates
 
-### compose.yml Template
+### compose-traefik.yml Template
 
-Used by `just scaffold compose <name>`:
-
-```
-Location: templates/compose.yml
-Variables: {{project_name}}, {{port}}, {{category}}
-```
-
-### kind-config.yaml Template
-
-Used by `just scaffold kind <name>`:
+Used by `just scaffold-compose <name>` and `just scaffold-site <name>`:
 
 ```
-Location: templates/kind-config.yaml
-Variables: {{cluster_name}}, {{http_port}}, {{tls_port}}
+Location: templates/compose-traefik.yml
+Variables: {{name}}, {{port}}, {{domain_suffix}}
 ```
 
-### kind-cluster.yml Template
+### compose-traefik.yml Template (unified)
 
-Used by `just kind-create <name>`:
+Used by all scaffold commands — `scaffold-compose`, `scaffold-site`, `kind-create`, `kind-import`:
 
 ```
-Location: traefik/config/templates/kind-cluster.yml
-Variables: {{cluster_name}}, {{http_port}}
+Location: templates/compose-traefik.yml
+Variables: {{name}}, {{host}}, {{port}}, {{domain_suffix}}
+```
+
+All types use the same template. The difference is in the variables passed:
+
+| Type | `{{host}}` | `{{domain_suffix}}` | Resolution |
+|---|---|---|---|
+| Compose | `myapp` (container name) | `.jorpo.loco` | Docker DNS on `loco` network |
+| Site | `blog` (container name) | `.loco` | Docker DNS on `loco` network |
+| Kind | `host.docker.internal` | `.jorpo.loco` | Host port (kind uses separate bridge) |
+
+Produces a Traefik file provider config with both bare domain and wildcard subdomain:
+
+```yaml
+http:
+  routers:
+    myapp:
+      rule: "HostRegexp(`{subdomain:.+}.myapp.jorpo.loco`) || Host(`myapp.jorpo.loco`)"
+      entryPoints: ["web"]
+      service: myapp
+    myapp-secure:
+      rule: "HostRegexp(`{subdomain:.+}.myapp.jorpo.loco`) || Host(`myapp.jorpo.loco`)"
+      entryPoints: ["websecure"]
+      service: myapp
+      tls: {}
+  services:
+    myapp:
+      loadBalancer:
+        servers:
+          - url: "http://myapp:3000"
 ```
 
 ---
@@ -568,9 +591,9 @@ Variables: {{cluster_name}}, {{http_port}}
 
 | Command | Description |
 |---|---|
-| `just scaffold compose NAME [PORT]` | Create new Docker Compose project |
-| `just scaffold kind NAME` | Create new kind cluster project |
-| `just scaffold site NAME` | Create new site project |
+| `just scaffold-compose NAME [PORT]` | Register a Docker Compose project with Traefik |
+| `just scaffold-kind NAME` | Generate kind-config.yaml for a new cluster project |
+| `just scaffold-site NAME [PORT]` | Register a site project (uses .loco TLD) with Traefik |
 
 ### Kind Management
 
@@ -680,10 +703,10 @@ just install-skills
 
 ```bash
 # Docker Compose project
-just scaffold compose myapp 3000
+just scaffold-compose myapp 3000
 
 # Kind cluster
-just scaffold kind mycluster
+just scaffold-kind mycluster
 just kind-create mycluster
 ```
 
