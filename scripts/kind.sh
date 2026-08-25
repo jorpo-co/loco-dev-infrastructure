@@ -4,9 +4,9 @@
 # All operations are idempotent.
 #
 # Usage:
-#   scripts/kind.sh create <name>    Create kind cluster + allocate ports + write Traefik config
+#   scripts/kind.sh create <name>    Create kind cluster + allocate ports
 #   scripts/kind.sh delete <name>    Delete cluster + free ports + remove Traefik config
-#   scripts/kind.sh import <name>    Register existing cluster with infra (ports + config + mirror)
+#   scripts/kind.sh import <name>    Register existing cluster with infra (ports + mirror)
 #   scripts/kind.sh list             List clusters with port mappings
 #   scripts/kind.sh ports            Show port allocations
 #   scripts/kind.sh scaffold <name>  Generate kind-config.yaml for a new cluster project
@@ -214,24 +214,6 @@ PYEOF
   _save_allocations "$updated"
   echo "  ✓ Ports allocated"
 
-  # Write Traefik file provider config
-  echo ""
-  echo "  Writing Traefik config..."
-  mkdir -p "$TRAEFIK_CONFIG_DIR"
-  local config_file="${TRAEFIK_CONFIG_DIR}/${name}.yml"
-  if [ -f "$TEMPLATE_DIR/compose-traefik.yml" ]; then
-    cat "$TEMPLATE_DIR/compose-traefik.yml" \
-      | sed "s/{{name}}/${name}/g" \
-      | sed "s/{{host}}/host.docker.internal/g" \
-      | sed "s/{{port}}/${http_port}/g" \
-      | sed "s/{{domain_suffix}}/.jorpo.loco/g" \
-      > "$config_file"
-    echo "  ✓ Config written to ${config_file}"
-  else
-    echo "  ✗ Template not found at ${TEMPLATE_DIR}/compose-traefik.yml"
-    exit 1
-  fi
-
   # Configure containerd mirror for registry
   echo ""
   echo "  Configuring containerd mirror for registry..."
@@ -270,7 +252,7 @@ CONFIG
   echo "  HTTP:  host.docker.internal:${http_port}"
   echo "  TLS:   host.docker.internal:${tls_port}"
   echo "  Domain: *.${name}.jorpo.loco → ${name}.jorpo.loco"
-  echo "  Config: ${config_file}"
+  echo "  Next:  scaffold-kind-traefik ${name} ${http_port} ${tls_port}"
   echo "  To switch: kubectl config use-context kind-${name}"
 }
 
@@ -338,24 +320,6 @@ json.dump(data, sys.stdout)
     echo "  ✓ Ports allocated"
   fi
 
-  # Write Traefik file provider config
-  echo ""
-  echo "  Writing Traefik config..."
-  mkdir -p "$TRAEFIK_CONFIG_DIR"
-  local config_file="${TRAEFIK_CONFIG_DIR}/${name}.yml"
-  if [ -f "$TEMPLATE_DIR/compose-traefik.yml" ]; then
-    cat "$TEMPLATE_DIR/compose-traefik.yml" \
-      | sed "s/{{name}}/${name}/g" \
-      | sed "s/{{host}}/host.docker.internal/g" \
-      | sed "s/{{port}}/${http_port}/g" \
-      | sed "s/{{domain_suffix}}/.jorpo.loco/g" \
-      > "$config_file"
-    echo "  ✓ Config written to ${config_file}"
-  else
-    echo "  ✗ Template not found at ${TEMPLATE_DIR}/compose-traefik.yml"
-    exit 1
-  fi
-
   # Configure containerd mirror for registry
   echo ""
   echo "  Configuring containerd mirror for registry..."
@@ -382,7 +346,7 @@ CONFIG
   echo "  HTTP:  host.docker.internal:${http_port}"
   echo "  TLS:   host.docker.internal:${tls_port}"
   echo "  Domain: *.${name}.jorpo.loco → ${name}.jorpo.loco"
-  echo "  Config: ${config_file}"
+  echo "  Next:  scaffold-kind-traefik ${name} ${http_port} ${tls_port}"
 }
 
 # ──────────────────────────────────────────────
@@ -496,7 +460,7 @@ cmd_ports() {
 }
 
 # ──────────────────────────────────────────────
-# Scaffold
+# Scaffold (kind-config.yaml)
 # ──────────────────────────────────────────────
 
 cmd_scaffold() {
@@ -564,17 +528,13 @@ cmd_scaffold() {
   echo "  Next:     kind-create ${name}"
 }
 
-# ──────────────────────────────────────────────
-# Dispatch
-# ──────────────────────────────────────────────
-
 usage() {
   echo "Usage: $(basename "$0") <command> [args]"
   echo ""
   echo "Commands:"
-  echo "  create <name>    Create kind cluster + allocate ports + write Traefik config"
+  echo "  create <name>    Create kind cluster + allocate ports"
   echo "  delete <name>    Delete cluster + free ports + remove Traefik config"
-  echo "  import <name>    Register existing cluster with infra (ports + config + mirror)"
+  echo "  import <name>    Register existing cluster with infra (ports + mirror)"
   echo "  list             List clusters with port mappings"
   echo "  ports            Show port allocations"
   echo "  scaffold <name>  Generate kind-config.yaml for a new cluster project"

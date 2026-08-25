@@ -1,22 +1,31 @@
 #!/usr/bin/env bash
-# scripts/scaffold.sh — Register new projects with the infra Traefik router
+# scripts/scaffold.sh — Register projects with the infra Traefik router
 #
-# Uses the file provider (etc/traefik/services/*.yml) instead of Docker labels.
-# All types — compose, kind, site — use Traefik config stored in infra.
+# All project types use the same Traefik file provider template.
+# SSL mode determines whether Traefik terminates HTTPS or passthroughs to the backend.
 #
 # Usage:
-#   scripts/scaffold.sh compose <name> [port] [category]
-#   scripts/scaffold.sh site <name> [port]
+#   scripts/scaffold.sh register --name <name> --domain <suffix> [options]
+#
+# Required:
+#   --name <name>        Project/service name (also used as container name for compose/site)
+#   --domain <suffix>    Domain suffix, e.g. .jorpo.loco or .loco
+#
+# Options:
+#   --path <path>        Project filesystem path (creates directory if not exists)
+#   --host <host>        Backend hostname (default: same as --name)
+#   --http-port <port>   HTTP backend port (default: 80)
+#   --tls-port <port>    TLS backend port (default: same as --http-port)
+#   --ssl <mode>         SSL mode (off by default): 'terminate' (Traefik terminates HTTPS)
+#                        or 'passthrough' (TLS forwarded directly to backend)
 
 set -euo pipefail
 
-# ── Optional named flags (for agent/container use) ──
-project_dir=""
+# ── Optional flags (before subcommand) ──
 infra_dir=""
-while [[ $# -gt 0 && "$1" == --* ]]; do
+while [[ $# -gt 0 && "$1" == --* && "$1" != --name && "$1" != --domain && "$1" != --path && "$1" != --host && "$1" != --http-port && "$1" != --tls-port && "$1" != --ssl ]]; do
   case "$1" in
-    --project-dir) shift; project_dir="$1"; shift ;;
-    --infra-dir)   shift; infra_dir="$1";   shift ;;
+    --infra-dir) shift; infra_dir="$1"; shift ;;
     *) break ;;
   esac
 done
@@ -41,56 +50,55 @@ if [ -f "${PROJECT_DIR}/.env.defaults" ]; then
 fi
 
 TEMPLATE_DIR="${PROJECT_DIR}/${TEMPLATES_RELPATH:-templates}"
-PROJECTS_DIR="${PROJECTS_DIR:-${HOME}/Projects}"
 TRAEFIK_CONFIG_DIR="${PROJECT_DIR}/${TRAEFIK_CONFIG_SUBDIR:-etc/traefik/services}"
 
 # ──────────────────────────────────────────────
-# Compose project
+# Register
 # ──────────────────────────────────────────────
 
-cmd_compose() {
-  local name="" port="3000" category=""
+cmd_register() {
+  local name="" domain="" project_path="" host="" http_port="80" tls_port="" ssl_mode=""
 
-  # When --project-dir is given, derive everything from the path
-  if [ -n "$project_dir" ]; then
-    name="$(basename "$project_dir")"
-    category="$(basename "$(dirname "$project_dir")")"
-    port="${1:-3000}"
-  else
-    if [ $# -lt 1 ]; then
-      echo "Usage: $(basename "$0") compose <name> [port] [category]"
-      echo "  name      Project name (also becomes the domain: name.jorpo.loco)"
-      echo "  port      Container port to expose (default: 3000)"
-      echo "  category  Subfolder under ~/Projects/ (default: inferred from PWD)"
-      echo ""
-      echo "Or with --project-dir (flags before subcommand):"
-      echo "  $(basename "$0") --project-dir /projects/<category>/<name> compose [port]"
-      exit 1
-    fi
-    name="$1"
-    port="${2:-3000}"
-    category="${3:-}"
-  fi
+  # Parse named arguments (after the subcommand)
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --name)       shift; name="$1" ;;
+      --domain)     shift; domain="$1" ;;
+      --path)       shift; project_path="$1" ;;
+      --host)       shift; host="$1" ;;
+      --http-port)  shift; http_port="$1" ;;
+      --tls-port)   shift; tls_port="$1" ;;
+      --ssl)        shift; ssl_mode="$1" ;;
+      *)            echo "  ✗ Unknown option: $1"; exit 1 ;;
+    esac
+    shift
+  done
 
-  # Determine category
-  if [ -z "$category" ]; then
-    local current_dir
-    current_dir=$(pwd)
-    if [[ "$current_dir" == "$PROJECTS_DIR"/* ]]; then
-      category=$(echo "$current_dir" | sed "s|${PROJECTS_DIR}/||" | cut -d'/' -f1)
-    else
-      echo "  Could not determine category. Specify it or run from ~/Projects/<category>/"
-      echo "  Usage: $(basename "$0") compose <name> [port] [category]"
-      exit 1
-    fi
-  fi
+  # Validate
+  if [ -z "$name" ]; then echo "  ✗ --name is required"; exit 1; fi
+  if [ -z "$domain" ]; then echo "  ✗ --domain is required"; exit 1; fi
+
+  # Defaults
+  host="${host:-$name}"
+  tls_port="${tls_port:-$http_port}"
 
   local traefik_file="${TRAEFIK_CONFIG_DIR}/${name}.yml"
 
-  echo "═══ Registering Compose Project: ${name} ═══"
+  echo "═══ Registering ${name} ═══"
+  echo "  Domain:     *${name}${domain} → ${name}${domain}"
+  echo "  Host:       ${host}"
+  echo "  HTTP port:  ${http_port}"
+  echo "  TLS port:   ${tls_port}"
+  echo "  SSL mode:   ${ssl_mode:-none}"
+
+  # Create project directory if path provided
+  if [ -n "$project_path" ]; then
+    mkdir -p "$project_path"
+    echo "  Path:       ${project_path}"
+  fi
+
   echo ""
 
-  # Check if already exists
   if [ -f "$traefik_file" ]; then
     echo "  ✗ Traefik config already exists at ${traefik_file}"
     exit 1
@@ -98,140 +106,91 @@ cmd_compose() {
 
   mkdir -p "$TRAEFIK_CONFIG_DIR"
 
-  # Generate Traefik file provider config from template
-  if [ -f "${TEMPLATE_DIR}/compose-traefik.yml" ]; then
-    cat "${TEMPLATE_DIR}/compose-traefik.yml" \
-      | sed "s/{{name}}/${name}/g" \
-      | sed "s/{{host}}/${name}/g" \
-      | sed "s/{{port}}/${port}/g" \
-      | sed "s/{{domain_suffix}}/.jorpo.loco/g" \
-      > "$traefik_file"
-    echo "  ✓ Created: ${traefik_file}"
-  else
-    echo "  ✗ Template not found at ${TEMPLATE_DIR}/compose-traefik.yml"
-    cat > "$traefik_file" <<YAML
+  # Write the full Traefik config based on SSL mode
+  case "${ssl_mode}" in
+    "")
+      cat > "$traefik_file" <<YAML
 http:
   routers:
     ${name}:
-      rule: "HostRegexp(\`{subdomain:.+}.${name}.jorpo.loco\`) || Host(\`${name}.jorpo.loco\`)"
+      rule: "HostRegexp(\`{subdomain:.+}.${name}${domain}\`) || Host(\`${name}${domain}\`)"
+      entryPoints: ["web"]
+      service: ${name}
+  services:
+    ${name}:
+      loadBalancer:
+        servers:
+          - url: "http://${host}:${http_port}"
+YAML
+      echo "  ✓ No SSL (HTTP only)"
+      ;;
+    terminate)
+      cat > "$traefik_file" <<YAML
+http:
+  routers:
+    ${name}:
+      rule: "HostRegexp(\`{subdomain:.+}.${name}${domain}\`) || Host(\`${name}${domain}\`)"
       entryPoints: ["web"]
       service: ${name}
     ${name}-secure:
-      rule: "HostRegexp(\`{subdomain:.+}.${name}.jorpo.loco\`) || Host(\`${name}.jorpo.loco\`)"
+      rule: "HostRegexp(\`{subdomain:.+}.${name}${domain}\`) || Host(\`${name}${domain}\`)"
       entryPoints: ["websecure"]
-      service: ${name}
+      service: ${name}-secure
       tls: {}
   services:
     ${name}:
       loadBalancer:
         servers:
-          - url: "http://${name}:${port}"
+          - url: "http://${host}:${http_port}"
+    ${name}-secure:
+      loadBalancer:
+        servers:
+          - url: "http://${host}:${http_port}"
 YAML
-    echo "  ✓ Created (minimal): ${traefik_file}"
-  fi
+      echo "  ✓ SSL terminate (Traefik handles HTTPS, forwards HTTP to backend)"
+      ;;
+    passthrough)
+      cat > "$traefik_file" <<YAML
+http:
+  routers:
+    ${name}:
+      rule: "HostRegexp(\`{subdomain:.+}.${name}${domain}\`) || Host(\`${name}${domain}\`)"
+      entryPoints: ["web"]
+      service: ${name}
+  services:
+    ${name}:
+      loadBalancer:
+        servers:
+          - url: "http://${host}:${http_port}"
 
-  echo ""
-  echo "═══ Project '${name}' registered ═══"
-  echo "  Domain:   http://${name}.jorpo.loco"
-  echo "  Traefik:  ${traefik_file}"
-  echo ""
-  echo "  ── Next steps ──"
-  echo "  1. Add to your project's compose.yaml:"
-  echo "       networks:"
-  echo "         - loco"
-  echo "  2. Add the external network:"
-  echo "       networks:"
-  echo "         loco:"
-  echo "           external: true"
-  echo "  3. Ensure your container is named '${name}' or use container_name: ${name}"
-  echo "  4. Start: docker compose up -d"
-}
-
-
-
-# ──────────────────────────────────────────────
-# Site project
-# ──────────────────────────────────────────────
-
-cmd_site() {
-  local name="" port="80"
-
-  if [ -n "$project_dir" ]; then
-    name="$(basename "$project_dir")"
-    port="${1:-80}"
-  else
-    if [ $# -lt 1 ]; then
-      echo "Usage: $(basename "$0") site <name> [port]"
-      echo "  name      Site name (becomes the domain: name.loco)"
-      echo "  port      Container port to expose (default: 80)"
-      echo ""
-      echo "Or with --project-dir (flags before subcommand):"
-      echo "  $(basename "$0") --project-dir /projects/sites/<name> site [port]"
+tcp:
+  routers:
+    ${name}-tcp:
+      rule: "HostSNI(\`*${name}${domain}\`)"
+      entryPoints: ["websecure"]
+      service: ${name}-tcp
+      tls:
+        passthrough: true
+  services:
+    ${name}-tcp:
+      loadBalancer:
+        servers:
+          - address: "${host}:${tls_port}"
+YAML
+      echo "  ✓ SSL passthrough (Traefik forwards TLS directly to backend)"
+      ;;
+    *)
+      echo "  ✗ Unknown SSL mode: ${ssl_mode} (use 'terminate' or 'passthrough')"
+      rm -f "$traefik_file"
       exit 1
-    fi
-    name="$1"
-    port="${2:-80}"
-  fi
+      ;;
+  esac
 
-  local traefik_file="${TRAEFIK_CONFIG_DIR}/${name}.yml"
-
-  echo "═══ Registering Site: ${name} ═══"
+  echo "  ✓ Created: ${traefik_file}"
   echo ""
-
-  # Check if already exists
-  if [ -f "$traefik_file" ]; then
-    echo "  ✗ Traefik config already exists at ${traefik_file}"
-    exit 1
-  fi
-
-  mkdir -p "$TRAEFIK_CONFIG_DIR"
-
-  # Generate Traefik file provider config from template
-  if [ -f "${TEMPLATE_DIR}/compose-traefik.yml" ]; then
-    cat "${TEMPLATE_DIR}/compose-traefik.yml" \
-      | sed "s/{{name}}/${name}/g" \
-      | sed "s/{{host}}/${name}/g" \
-      | sed "s/{{port}}/${port}/g" \
-      | sed "s/{{domain_suffix}}/.loco/g" \
-      > "$traefik_file"
-    echo "  ✓ Created: ${traefik_file}"
-  else
-    cat > "$traefik_file" <<YAML
-http:
-  routers:
-    ${name}:
-      rule: "HostRegexp(\`{subdomain:.+}.${name}.loco\`) || Host(\`${name}.loco\`)"
-      entryPoints: ["web"]
-      service: ${name}
-    ${name}-secure:
-      rule: "HostRegexp(\`{subdomain:.+}.${name}.loco\`) || Host(\`${name}.loco\`)"
-      entryPoints: ["websecure"]
-      service: ${name}
-      tls: {}
-  services:
-    ${name}:
-      loadBalancer:
-        servers:
-          - url: "http://${name}:${port}"
-YAML
-    echo "  ✓ Created (minimal): ${traefik_file}"
-  fi
-
-  echo ""
-  echo "═══ Site '${name}' registered ═══"
-  echo "  Domain:   http://${name}.loco"
+  echo "═══ ${name} registered ═══"
+  echo "  Domain:   http://${name}${domain}"
   echo "  Traefik:  ${traefik_file}"
-  echo ""
-  echo "  ── Next steps ──"
-  echo "  1. Add to your site's compose.yaml:"
-  echo "       networks:"
-  echo "         - loco"
-  echo "  2. Add the external network:"
-  echo "       networks:"
-  echo "         loco:"
-  echo "           external: true"
-  echo "  3. Ensure your container is named '${name}' or use container_name: ${name}"
-  echo "  4. Start: docker compose up -d"
 }
 
 # ──────────────────────────────────────────────
@@ -239,14 +198,27 @@ YAML
 # ──────────────────────────────────────────────
 
 usage() {
-  echo "Usage: $(basename "$0") <command> [args]"
+  echo "Usage: $(basename "$0") register [options]"
   echo ""
-  echo "Commands:"
-  echo "  compose <name> [port] [category]    Register a Docker Compose project with Traefik"
-  echo "  site <name> [port]                  Register a site project (uses .loco TLD) with Traefik"
+  echo "Required:"
+  echo "  --name <name>      Project/service name"
+  echo "  --domain <suffix>  Domain suffix (.jorpo.loco, .loco, etc.)"
   echo ""
-  echo "All types use Traefik file provider config stored in etc/traefik/services/."
-  echo "No Docker labels or loco.compose.yaml files are generated."
+  echo "Options:"
+  echo "  --path <path>       Project filesystem path (creates directory if not exists)"
+  echo "  --host <host>       Backend hostname (default: same as --name)"
+  echo "  --http-port <port>  HTTP backend port (default: 80)"
+  echo "  --tls-port <port>   TLS backend port (default: same as --http-port)"
+  echo "  --ssl <mode>        SSL mode: terminate or passthrough (default: no SSL)"
+  echo ""
+  echo "  --infra-dir <path>  Explicit infra root path (before subcommand)"
+  echo ""
+  echo "Examples:"
+  echo "  scaffold.sh register --name myapp --domain .jorpo.loco --http-port 3000              # HTTP only"
+  echo "  scaffold.sh register --name myapp --domain .jorpo.loco --http-port 3000 --ssl terminate  # HTTP + HTTPS"
+  echo "  scaffold.sh register --name blog --domain .loco --http-port 80"
+  echo "  scaffold.sh register --name mycluster --domain .jorpo.loco --host host.docker.internal --http-port 30080 --tls-port 30443 --ssl passthrough"
+  echo "  scaffold.sh register --name myapp --domain .jorpo.loco --path /projects/jorpo/myapp --http-port 3000"
   exit 1
 }
 
@@ -259,9 +231,8 @@ main() {
   shift
 
   case "${cmd}" in
-    compose) cmd_compose "$@" ;;
-    site)    cmd_site "$@" ;;
-    *)       usage ;;
+    register) cmd_register "$@" ;;
+    *)        usage ;;
   esac
 }
 

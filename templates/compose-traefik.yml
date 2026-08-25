@@ -1,0 +1,11 @@
+http:
+  routers:
+    {{name}}:
+      rule: "HostRegexp(`{subdomain:.+}.{{name}}{{domain}}`) || Host(`{{name}}{{domain}}`)"
+      entryPoints: ["web"]
+      service: {{name}}
+  services:
+    {{name}}:
+      loadBalancer:
+        servers:
+          - url: "http://{{host}}:{{http_port}}"

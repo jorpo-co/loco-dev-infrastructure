@@ -76,20 +76,38 @@ registry-clean:
   @{{ SCRIPTS_DIR }}/registry.sh clean
 
 
-# register a compose project with Traefik (file provider, no loco.compose.yaml)
+# register a compose project with Traefik
 scaffold-compose name port="3000":
-  @{{ SCRIPTS_DIR }}/scaffold.sh compose "{{ name }}" "{{ port }}"
+  @{{ SCRIPTS_DIR }}/scaffold.sh register \
+    --name "{{ name }}" \
+    --domain .jorpo.loco \
+    --http-port "{{ port }}" \
+    --ssl terminate
 
-# scaffold a kind cluster project
+# scaffold a kind cluster project (kind-config.yaml)
 scaffold-kind name:
   @{{ SCRIPTS_DIR }}/kind.sh scaffold "{{ name }}"
 
-# register a site project with Traefik (file provider, .loco TLD)
+# register a kind cluster with Traefik (passthrough SSL, host.docker.internal)
+scaffold-kind-traefik name http_port tls_port:
+  @{{ SCRIPTS_DIR }}/scaffold.sh register \
+    --name "{{ name }}" \
+    --domain .jorpo.loco \
+    --host host.docker.internal \
+    --http-port "{{ http_port }}" \
+    --tls-port "{{ tls_port }}" \
+    --ssl passthrough
+
+# register a site project with Traefik (.loco TLD)
 scaffold-site name port="80":
-  @{{ SCRIPTS_DIR }}/scaffold.sh site "{{ name }}" "{{ port }}"
+  @{{ SCRIPTS_DIR }}/scaffold.sh register \
+    --name "{{ name }}" \
+    --domain .loco \
+    --http-port "{{ port }}" \
+    --ssl terminate
 
 
-# create a kind cluster with port allocation + Traefik config
+# create a kind cluster with port allocation (run scaffold-kind-traefik after)
 kind-create name:
   @{{ SCRIPTS_DIR }}/kind.sh create "{{ name }}"
 
