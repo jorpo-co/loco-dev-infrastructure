@@ -1,6 +1,6 @@
 ---
 name: loco-infra
-description: "Manage the local development infrastructure stack. Starts/stops the always-on Traefik + Registry + skillrunner network backbone, manages wildcard DNS (*.jorpo.loco / *.loco), handles the Docker registry, and reports on what's running. Use whenever the user asks about 'the infra', 'the registry', 'traefik', network routing, local DNS, or the skillrunner container at localhost:9999."
+description: "Manage the local development infrastructure stack. Starts/stops the always-on Traefik + Registry + Registry UI + skillrunner network backbone, manages wildcard DNS (*.jorpo.loco / *.loco), handles the Docker registry, and reports on what's running. Use whenever the user asks about 'the infra', 'the registry', 'traefik', network routing, local DNS, or the skillrunner container at localhost:9999."
 ---
 
 # Loco Infra
@@ -49,8 +49,8 @@ DNS manages macOS system state (dnsmasq, loopback alias, resolver files).
 Run these directly on the host:
 
 ```bash
-cd ~/Projects/_infra && just install   # full install: DNS + skills + images
-just dns-status                        # check DNS state
+cd ~/Projects/_infra && just setup   # full install: DNS + skills + images
+just status                           # check DNS + stack + skills state
 ```
 
 ## Key Paths (inside the container)
@@ -70,7 +70,7 @@ just dns-status                        # check DNS state
 1. Check skillrunner: `curl -s http://localhost:9999/health`
 2. Check infra: `curl -s -X POST http://localhost:9999/run -d '{"recipe":"doctor"}'`
 3. Traefik dashboard: http://traefik.jorpo.loco
-4. DNS problems: `cd ~/Projects/_infra && just dns-status`
+4. DNS problems: `cd ~/Projects/_infra && just status` (or `scripts/dns.sh status`)
 
 ## What NOT to do
 

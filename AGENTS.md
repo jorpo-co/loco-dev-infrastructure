@@ -6,7 +6,7 @@ AI agents (pi) interact with the Loco Infra stack via **three installable skills
 ## Installation
 
 ```bash
-cd ~/Projects/_infra && just install
+cd ~/Projects/_infra && just setup
 ```
 
 Symlinks `skills/loco-{infra,project,kind}` → `~/.pi/skills/`, installs DNS, pulls images.
@@ -40,16 +40,21 @@ curl -s -X POST http://localhost:9999/run -d '{"recipe":"doctor"}'
 curl -s -X POST http://localhost:9999/run -d '{"recipe":"registry-list"}'
 ```
 
-DNS is host-only (needs sudo + brew): `cd ~/Projects/_infra && just dns-status`.
+DNS is host-only (needs sudo + brew): `cd ~/Projects/_infra && just status` (or `scripts/dns.sh status`).
 
 ### loco-project — Register projects with Traefik
 
 Writes a Traefik file provider config to `etc/traefik/services/<name>.yml` (no loco.compose.yaml).
 All types use the file provider — no Docker labels.
 
+Three SSL modes are available:
+- **HTTP only** (no SSL): `scaffold-http-only`
+- **SSL terminate** (Traefik handles HTTPS, forwards HTTP to backend): `scaffold-terminate`
+- **SSL passthrough** (TLS forwarded directly to backend, for kind clusters): `scaffold-passthrough`
+
 ```bash
-curl -s -X POST http://localhost:9999/run -d '{"recipe":"scaffold-compose","args":["myapp","3000"]}'
-curl -s -X POST http://localhost:9999/run -d '{"recipe":"scaffold-site","args":["blog","80"]}'
+curl -s -X POST http://localhost:9999/run -d '{"recipe":"scaffold-http-only","args":["myapp","3000"]}'
+curl -s -X POST http://localhost:9999/run -d '{"recipe":"scaffold-terminate","args":["blog","80"]}'
 ```
 
 The agent resolves the project directory from the user's prompt and ensures CWD is set
@@ -78,7 +83,7 @@ the infra Traefik router — allocates ports, writes config, configures containe
 | Problem | First action |
 |---|---|
 | Skillrunner not responding | `curl -s http://localhost:9999/health` |
-| DNS not resolving | `cd ~/Projects/_infra && just dns-status` |
+| DNS not resolving | `cd ~/Projects/_infra && just status` (or `scripts/dns.sh status`) |
 | Traefik not routing | Check http://traefik.jorpo.loco dashboard |
 | Kind cluster issues | `{"recipe":"kind-list"}` or `{"script":"/usr/local/bin/kind","args":["get","clusters"]}` |
 

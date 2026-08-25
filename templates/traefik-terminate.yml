@@ -1,0 +1,20 @@
+http:
+  routers:
+    {{name}}:
+      rule: "HostRegexp(`{subdomain:.+}.{{name}}{{domain}}`) || Host(`{{name}}{{domain}}`)"
+      entryPoints: ["web"]
+      service: {{name}}
+    {{name}}-secure:
+      rule: "HostRegexp(`{subdomain:.+}.{{name}}{{domain}}`) || Host(`{{name}}{{domain}}`)"
+      entryPoints: ["websecure"]
+      service: {{name}}-secure
+      tls: {}
+  services:
+    {{name}}:
+      loadBalancer:
+        servers:
+          - url: "http://{{host}}:{{http_port}}"
+    {{name}}-secure:
+      loadBalancer:
+        servers:
+          - url: "http://{{host}}:{{http_port}}"

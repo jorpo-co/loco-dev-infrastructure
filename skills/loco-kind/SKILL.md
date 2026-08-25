@@ -5,109 +5,68 @@ description: "Create, delete, import, and manage kind (Kubernetes-in-Docker) clu
 
 # Loco Kind
 
-The user runs kind clusters alongside Docker Compose projects. All types (compose, kind, site)
-use the **Traefik file provider** for routing — no Docker labels. Compose projects use Docker DNS
-on the `loco` network, while kind clusters use `host.docker.internal` because they run on a
-separate bridge network.
-
-The **skillrunner API** at `http://localhost:9999` provides kind, kubectl, and all
-management commands via the `recipe` API.
+Kind clusters use the **Traefik file provider** for routing, routing via `host.docker.internal`
+(since they run on a separate bridge network, not `loco`). The **skillrunner API** at
+`http://localhost:9999` provides kind, kubectl, and all management commands.
 
 ## How commands are run
 
 ```bash
-curl -s -X POST http://localhost:9999/run \
-  -d '{"recipe":"kind-create","args":["<name>"]}'
-curl -s -X POST http://localhost:9999/run \
-  -d '{"recipe":"kind-delete","args":["<name>"]}'
-curl -s -X POST http://localhost:9999/run \
-  -d '{"recipe":"kind-import","args":["<name>"]}'
-curl -s -X POST http://localhost:9999/run \
-  -d '{"recipe":"kind-list"}'
-curl -s -X POST http://localhost:9999/run \
-  -d '{"recipe":"kind-ports"}'
-curl -s -X POST http://localhost:9999/run \
-  -d '{"recipe":"scaffold-kind","args":["<name>"]}'
+# Create a cluster (allocates ports, creates cluster, registers Traefik route, configures mirror)
+curl -s -X POST http://localhost:9999/run -d '{"recipe":"kind-create","args":["<name>"]}'
+
+# Import an existing cluster (ports, mirror, Traefik route — no cluster creation)
+curl -s -X POST http://localhost:9999/run -d '{"recipe":"kind-import","args":["<name>"]}'
+
+# Delete a cluster (frees ports, removes Traefik config)
+curl -s -X POST http://localhost:9999/run -d '{"recipe":"kind-delete","args":["<name>"]}'
+
+# Info
+curl -s -X POST http://localhost:9999/run -d '{"recipe":"kind-list"}'
+curl -s -X POST http://localhost:9999/run -d '{"recipe":"kind-ports"}'
+
+# Scaffold kind-config.yaml for a new project
+curl -s -X POST http://localhost:9999/run -d '{"recipe":"scaffold-kind","args":["<name>"]}'
 ```
 
-The container has:
-- `/infra` → `~/Projects/_infra` (port allocations, Traefik configs, templates)
-- `/projects` → `~/Projects` (all project directories)
-- Docker socket (kind creates containers on the host)
+## Cluster lifecycle
 
-## Architecture
-
-```
-*.<cluster>.jorpo.loco:80 → Traefik (Docker, _infra/)
-  → file provider config (/infra/etc/traefik/services/<cluster>.yml)
-    → http://host.docker.internal:<http_port>
-      → kind node (Docker container, hostPort: <http_port>)
-        → cluster's internal ingress controller (NodePort: 30080)
-          → pods
+### 1. Scaffold (optional)
+Generates `kind-config.yaml` at the inferred project path with placeholder ports:
+```bash
+curl -s -X POST http://localhost:9999/run -d '{"recipe":"scaffold-kind","args":["mycluster"]}'
 ```
 
-- External Traefik owns host ports 80/443. Kind clusters must NOT bind 80/443.
-- Each cluster publishes a unique high port (HTTP + TLS).
-- Routing is via **file provider** (not Docker labels).
+### 2. Create (one-step: cluster + routing)
+```bash
+curl -s -X POST http://localhost:9999/run -d '{"recipe":"kind-create","args":["mycluster"]}'
+```
+This single command:
+- Allocates HTTP/TLS ports
+- Creates the kind cluster
+- Writes the Traefik file provider config to `/infra/etc/traefik/services/mycluster.yml`
+- Configures the containerd registry mirror
 
-## Port allocation (deterministic)
+### Import (for existing clusters)
+```bash
+curl -s -X POST http://localhost:9999/run -d '{"recipe":"kind-import","args":["mycluster"]}'
+```
+Same as create but does **not** create the cluster — registers an existing one.
+
+### Delete
+```bash
+curl -s -X POST http://localhost:9999/run -d '{"recipe":"kind-delete","args":["mycluster"]}'
+```
+Deletes cluster, removes Traefik config, frees ports.
+
+## Port allocation
+
+HTTP: 30080+N, TLS: 30443+N. Ports freed on delete. Never assign manually.
 
 | Cluster | HTTP | TLS | Domain |
 |---|---|---|---|
 | orc | 30080 | 30443 | `*.orc.jorpo.loco` |
 | next | 30081 | 30444 | `*.next.jorpo.loco` |
-
-HTTP: 30080+N, TLS: 30443+N. Ports freed on delete. Never assign manually.
-
-## Scaffolding a kind cluster project
-
-Before creating a cluster, scaffold the project config:
-
-```bash
-curl -s -X POST http://localhost:9999/run -d '{"recipe":"scaffold-kind","args":["mycluster"]}'
-```
-
-Creates `kind-config.yaml` at the inferred project path with domain `*.mycluster.jorpo.loco`.
-Ports are placeholders — allocated at creation time.
-
-## Creating a kind cluster
-
-```bash
-curl -s -X POST http://localhost:9999/run -d '{"recipe":"kind-create","args":["mycluster"]}'
-```
-
-Allocates ports, creates the cluster, writes Traefik config, configures containerd mirror.
-Idempotent — rerun safely if cluster already exists.
-
-## Importing an existing kind cluster
-
-Use when the cluster already exists (created manually or by another tool):
-
-```bash
-curl -s -X POST http://localhost:9999/run -d '{"recipe":"kind-import","args":["mycluster"]}'
-```
-
-This:
-1. Verifies the cluster exists via `kind get clusters`
-2. Allocates or reuses ports
-3. Writes Traefik file provider config to `/infra/etc/traefik/services/mycluster.yml`
-4. Configures containerd mirror on all nodes
-5. Does **not** create the cluster
-
-## Deleting a kind cluster
-
-```bash
-curl -s -X POST http://localhost:9999/run -d '{"recipe":"kind-delete","args":["mycluster"]}'
-```
-
-Deletes cluster, removes Traefik config, frees ports.
-
-## Listing / ports
-
-```bash
-curl -s -X POST http://localhost:9999/run -d '{"recipe":"kind-list"}'
-curl -s -X POST http://localhost:9999/run -d '{"recipe":"kind-ports"}'
-```
 
 ## After creating or importing
 
@@ -120,22 +79,10 @@ curl -s -X POST http://localhost:9999/run \
 curl -H "Host: myservice.mycluster.jorpo.loco" http://10.254.254.254/
 ```
 
-## What happens inside the cluster (cluster's own concern)
+## Important notes
 
-- Needs its own ingress controller (Traefik or nginx-ingress).
-- Must expose `NodePort: 30080/30443` (the containerPort, NOT hostPort).
-- We route to the node — the cluster's ingress handles pod routing.
-
-## Files managed
-
-| File | Container path | Host path |
-|---|---|---|
-| Port allocations | `/infra/var/port-allocations.json` | `_infra/var/port-allocations.json` |
-| Traefik config | `/infra/etc/traefik/services/<cluster>.yml` | `_infra/etc/traefik/services/<cluster>.yml` |
-
-## Golden Rules
-
-- **Do NOT** hand-edit `/infra/etc/traefik/services/*.yml` — use `kind.sh`.
+- **External Traefik owns host ports 80/443** — kind clusters must NOT bind them.
+- **Inside the cluster** needs its own ingress controller (Traefik or nginx-ingress) with `NodePort: 30080/30443` (the containerPort, NOT hostPort).
+- **Do NOT** hand-edit `/infra/etc/traefik/services/*.yml` — use `kind-create`/`kind-import`.
 - **Do NOT** manually reserve ports — allocation is automatic and tracked.
-- **Do NOT** bind host ports 80/443 from kind nodes — conflicts with Traefik.
 - **Do NOT** mount `loco` network into the cluster — kind uses its own bridge.

@@ -1,0 +1,25 @@
+http:
+  routers:
+    {{name}}:
+      rule: "HostRegexp(`{subdomain:.+}.{{name}}{{domain}}`) || Host(`{{name}}{{domain}}`)"
+      entryPoints: ["web"]
+      service: {{name}}
+  services:
+    {{name}}:
+      loadBalancer:
+        servers:
+          - url: "http://{{host}}:{{http_port}}"
+
+tcp:
+  routers:
+    {{name}}-tcp:
+      rule: "HostSNI(`*{{name}}{{domain}}`)"
+      entryPoints: ["websecure"]
+      service: {{name}}-tcp
+      tls:
+        passthrough: true
+  services:
+    {{name}}-tcp:
+      loadBalancer:
+        servers:
+          - address: "{{host}}:{{tls_port}}"

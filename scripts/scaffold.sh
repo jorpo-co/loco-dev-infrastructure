@@ -106,84 +106,35 @@ cmd_register() {
 
   mkdir -p "$TRAEFIK_CONFIG_DIR"
 
-  # Write the full Traefik config based on SSL mode
+  local template_name=""
   case "${ssl_mode}" in
-    "")
-      cat > "$traefik_file" <<YAML
-http:
-  routers:
-    ${name}:
-      rule: "HostRegexp(\`{subdomain:.+}.${name}${domain}\`) || Host(\`${name}${domain}\`)"
-      entryPoints: ["web"]
-      service: ${name}
-  services:
-    ${name}:
-      loadBalancer:
-        servers:
-          - url: "http://${host}:${http_port}"
-YAML
-      echo "  ✓ No SSL (HTTP only)"
-      ;;
-    terminate)
-      cat > "$traefik_file" <<YAML
-http:
-  routers:
-    ${name}:
-      rule: "HostRegexp(\`{subdomain:.+}.${name}${domain}\`) || Host(\`${name}${domain}\`)"
-      entryPoints: ["web"]
-      service: ${name}
-    ${name}-secure:
-      rule: "HostRegexp(\`{subdomain:.+}.${name}${domain}\`) || Host(\`${name}${domain}\`)"
-      entryPoints: ["websecure"]
-      service: ${name}-secure
-      tls: {}
-  services:
-    ${name}:
-      loadBalancer:
-        servers:
-          - url: "http://${host}:${http_port}"
-    ${name}-secure:
-      loadBalancer:
-        servers:
-          - url: "http://${host}:${http_port}"
-YAML
-      echo "  ✓ SSL terminate (Traefik handles HTTPS, forwards HTTP to backend)"
-      ;;
-    passthrough)
-      cat > "$traefik_file" <<YAML
-http:
-  routers:
-    ${name}:
-      rule: "HostRegexp(\`{subdomain:.+}.${name}${domain}\`) || Host(\`${name}${domain}\`)"
-      entryPoints: ["web"]
-      service: ${name}
-  services:
-    ${name}:
-      loadBalancer:
-        servers:
-          - url: "http://${host}:${http_port}"
-
-tcp:
-  routers:
-    ${name}-tcp:
-      rule: "HostSNI(\`*${name}${domain}\`)"
-      entryPoints: ["websecure"]
-      service: ${name}-tcp
-      tls:
-        passthrough: true
-  services:
-    ${name}-tcp:
-      loadBalancer:
-        servers:
-          - address: "${host}:${tls_port}"
-YAML
-      echo "  ✓ SSL passthrough (Traefik forwards TLS directly to backend)"
-      ;;
+    "")          template_name="traefik-http-only.yml" ;;
+    terminate)   template_name="traefik-terminate.yml" ;;
+    passthrough) template_name="traefik-passthrough.yml" ;;
     *)
       echo "  ✗ Unknown SSL mode: ${ssl_mode} (use 'terminate' or 'passthrough')"
-      rm -f "$traefik_file"
       exit 1
       ;;
+  esac
+
+  local template_file="${TEMPLATE_DIR}/${template_name}"
+  if [ ! -f "$template_file" ]; then
+    echo "  ✗ Template not found: ${template_file}"
+    exit 1
+  fi
+
+  cat "$template_file" \
+    | sed "s/{{name}}/${name}/g" \
+    | sed "s/{{domain}}/${domain}/g" \
+    | sed "s/{{host}}/${host}/g" \
+    | sed "s/{{http_port}}/${http_port}/g" \
+    | sed "s/{{tls_port}}/${tls_port}/g" \
+    > "$traefik_file"
+
+  case "${ssl_mode}" in
+    "")          echo "  ✓ No SSL (HTTP only)" ;;
+    terminate)   echo "  ✓ SSL terminate (Traefik handles HTTPS, forwards HTTP to backend)" ;;
+    passthrough) echo "  ✓ SSL passthrough (Traefik forwards TLS directly to backend)" ;;
   esac
 
   echo "  ✓ Created: ${traefik_file}"

@@ -10,19 +10,33 @@ networking gets a Traefik file provider config in `etc/traefik/services/<name>.y
 the infra stack. No `loco.compose.yaml` files — the project's own compose file just needs to
 join the `loco` network.
 
-All types (compose, kind, site) use the file provider approach. No Docker labels required.
-
 ## How commands are run
-
-All operations use the skillrunner at `http://localhost:9999` via the `recipe` API:
 
 ```bash
 curl -s -X POST http://localhost:9999/run \
-  -d '{"recipe":"scaffold-compose","args":["<name>","<port>"]}'
+  -d '{"recipe":"<recipe>","args":["<name>","<port>"]}'
 ```
 
-The skillrunner mounts `/infra` → `_infra` and `/projects` → `~/Projects`.
-Recipes run via `just --justfile /infra/justfile`.
+Two SSL modes are available, each using a different template:
+
+| Mode | Recipe | Template | Use case |
+|---|---|---|---|
+| HTTP only | `scaffold-http-only` | `traefik-http-only.yml` | Compose projects (internal) |
+| SSL terminate | `scaffold-terminate` | `traefik-terminate.yml` | Public sites (`.loco` TLD) |
+
+Kind clusters use `scaffold-passthrough` internally — handled automatically by `loco-kind`.
+
+The templates produce a config with both bare domain and wildcard subdomain
+(e.g. `myapp.jorpo.loco` + `*.myapp.jorpo.loco`).
+
+## Variable mapping
+
+The templates use `{{name}}`, `{{domain}}`, `{{host}}`, `{{http_port}}`, `{{tls_port}}`:
+
+| Type | Recipe | `{{host}}` | `{{domain}}` | Resolution |
+|---|---|---|---|---|
+| Compose | `scaffold-http-only` | container name | `.jorpo.loco` | Docker DNS on `loco` network |
+| Site | `scaffold-terminate` | container name | `.loco` | Docker DNS on `loco` network |
 
 ## Determining the project directory
 
@@ -35,39 +49,13 @@ The agent must ensure CWD is set correctly, or pass `--project-dir` via the unde
 | "make a new project called 'myapp' in ./something/" | Resolve to `/projects/<category>/myapp/` |
 | "make me a project called 'concerto'" | Default category `jorpo` → `/projects/jorpo/concerto` |
 
-## Creating a new compose project
+## What the project's compose.yaml needs
 
-```bash
-curl -s -X POST http://localhost:9999/run \
-  -d '{"recipe":"scaffold-compose","args":["myapp","3000"]}'
-```
+After scaffolding, the project's own `compose.yaml` must:
 
-Writes a Traefik file provider config to `/infra/etc/traefik/services/myapp.yml`:
-
-```yaml
-http:
-  routers:
-    myapp:
-      rule: "HostRegexp(`{subdomain:.+}.myapp.jorpo.loco`) || Host(`myapp.jorpo.loco`)"
-      entryPoints: ["web"]
-      service: myapp
-    myapp-secure:
-      rule: "HostRegexp(`{subdomain:.+}.myapp.jorpo.loco`) || Host(`myapp.jorpo.loco`)"
-      entryPoints: ["websecure"]
-      service: myapp
-      tls: {}
-  services:
-    myapp:
-      loadBalancer:
-        servers:
-          - url: "http://myapp:3000"
-```
-
-This gives both `myapp.jorpo.loco` and `*.myapp.jorpo.loco` (e.g. `api.myapp.jorpo.loco`).
-Traefik resolves `myapp:3000` via Docker DNS — both are on the `loco` network.
-
-No `loco.compose.yaml` is generated. The user's project just needs to be on the `loco`
-network — add to their own `compose.yaml`:
+1. Set `container_name: <name>` on the service (or name the service after the project)
+2. Add `networks: [loco]` to the service
+3. Define an external network: `networks: { loco: { external: true } }`
 
 ```yaml
 services:
@@ -82,50 +70,10 @@ networks:
     external: true
 ```
 
-## Creating a site (`.loco` TLD)
-
-```bash
-curl -s -X POST http://localhost:9999/run \
-  -d '{"recipe":"scaffold-site","args":["blog","80"]}'
-```
-
-Writes a Traefik file provider config with domain `blog.loco` to
-`/infra/etc/traefik/services/blog.yml`.
-
-## The generated Traefik config
-
-```yaml
-http:
-  routers:
-    <name>:
-      rule: "HostRegexp(`{subdomain:.+}.<name>.jorpo.loco`) || Host(`<name>.jorpo.loco`)"
-      entryPoints: ["web"]
-      service: <name>
-  services:
-    <name>:
-      loadBalancer:
-        servers:
-          - url: "http://<name>:<port>"
-```
-
-This gives both `<name>.jorpo.loco` and `*.<name>.jorpo.loco`.
-
-- `server.port` is the **container** port, not a host port.
-- The container name must match `<name>` so Docker DNS resolves correctly.
-- Domain is `<name>.jorpo.loco` for compose projects, `<name>.loco` for sites.
-
-## Next steps after scaffolding
-
-The project's own `compose.yaml` needs:
-
-1. `container_name: <name>` on the service (or name the service after the project)
-2. `networks: [loco]` on the service
-3. An external network definition: `networks: { loco: { external: true } }`
-
 ## Modifying an existing project
 
-If the project already has a Traefik config in `etc/traefik/services/`, edit it in place.
-The Traefik file provider watches for changes — no restart needed.
+Edit the config in `etc/traefik/services/<name>.yml` directly. Traefik watches for changes —
+no restart needed.
 
 ## Validating output
 

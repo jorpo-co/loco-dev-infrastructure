@@ -1,12 +1,13 @@
 #!/usr/bin/env bash
-# scripts/kind.sh — Manage kind clusters with automatic port allocation + file provider config
+# scripts/kind.sh — Manage kind clusters with automatic port allocation + Traefik routing
 #
-# All operations are idempotent.
+# All operations are idempotent. Both create and import automatically register the
+# Traefik file provider route via scaffold.sh — no separate step needed.
 #
 # Usage:
-#   scripts/kind.sh create <name>    Create kind cluster + allocate ports
+#   scripts/kind.sh create <name>    Create kind cluster + allocate ports + register Traefik route
 #   scripts/kind.sh delete <name>    Delete cluster + free ports + remove Traefik config
-#   scripts/kind.sh import <name>    Register existing cluster with infra (ports + mirror)
+#   scripts/kind.sh import <name>    Register existing cluster with infra (ports, mirror, Traefik config)
 #   scripts/kind.sh list             List clusters with port mappings
 #   scripts/kind.sh ports            Show port allocations
 #   scripts/kind.sh scaffold <name>  Generate kind-config.yaml for a new cluster project
@@ -122,6 +123,34 @@ PYEOF
 _cluster_exists() {
   local name="$1"
   kind get clusters 2>/dev/null | grep -q "^${name}$"
+}
+
+# ──────────────────────────────────────────────
+# Traefik route registration
+# ──────────────────────────────────────────────
+
+_register_traefik_route() {
+  local name="$1"
+  local http_port="$2"
+  local tls_port="$3"
+
+  echo ""
+  echo "═══ Registering Traefik route for ${name} ═══"
+
+  local scaffold="${SCRIPT_DIR}/scaffold.sh"
+  if [ ! -f "$scaffold" ]; then
+    echo "  ✗ scaffold.sh not found at ${scaffold}"
+    echo "  Register manually: scaffold-passthrough ${name} .jorpo.loco ${http_port} ${tls_port}"
+    return 1
+  fi
+
+  "$scaffold" --infra-dir "$PROJECT_DIR" register \
+    --name "$name" \
+    --domain ".jorpo.loco" \
+    --host "host.docker.internal" \
+    --http-port "$http_port" \
+    --tls-port "$tls_port" \
+    --ssl "passthrough"
 }
 
 # ──────────────────────────────────────────────
@@ -252,7 +281,10 @@ CONFIG
   echo "  HTTP:  host.docker.internal:${http_port}"
   echo "  TLS:   host.docker.internal:${tls_port}"
   echo "  Domain: *.${name}.jorpo.loco → ${name}.jorpo.loco"
-  echo "  Next:  scaffold-kind-traefik ${name} ${http_port} ${tls_port}"
+
+  _register_traefik_route "$name" "$http_port" "$tls_port"
+
+  echo ""
   echo "  To switch: kubectl config use-context kind-${name}"
 }
 
@@ -346,7 +378,8 @@ CONFIG
   echo "  HTTP:  host.docker.internal:${http_port}"
   echo "  TLS:   host.docker.internal:${tls_port}"
   echo "  Domain: *.${name}.jorpo.loco → ${name}.jorpo.loco"
-  echo "  Next:  scaffold-kind-traefik ${name} ${http_port} ${tls_port}"
+
+  _register_traefik_route "$name" "$http_port" "$tls_port"
 }
 
 # ──────────────────────────────────────────────
@@ -532,9 +565,9 @@ usage() {
   echo "Usage: $(basename "$0") <command> [args]"
   echo ""
   echo "Commands:"
-  echo "  create <name>    Create kind cluster + allocate ports"
+  echo "  create <name>    Create kind cluster + allocate ports + register Traefik route"
   echo "  delete <name>    Delete cluster + free ports + remove Traefik config"
-  echo "  import <name>    Register existing cluster with infra (ports + mirror)"
+  echo "  import <name>    Register existing cluster with infra (ports, mirror, Traefik config)"
   echo "  list             List clusters with port mappings"
   echo "  ports            Show port allocations"
   echo "  scaffold <name>  Generate kind-config.yaml for a new cluster project"
