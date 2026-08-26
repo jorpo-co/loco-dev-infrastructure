@@ -67,7 +67,7 @@ cmd_infra() {
   CAROOT="${CERT_DIR}" mkcert \
     -cert-file "${CERTS_DIR}/loco-infra.crt" \
     -key-file "${CERTS_DIR}/loco-infra.key" \
-    registry.loco traefik.loco
+    registry.loco traefik.loco infra.loco
 
   cat > "${CONFIG_DIR}/_certs-loco-infra.yml" <<'EOF'
 tls:

@@ -3,9 +3,10 @@ FROM docker:dind
 ENV INFRA_DIR=/infra
 ENV PROJECTS_DIR=/projects
 ENV DOCKER_HOST=unix:///var/run/docker.sock
+ENV PYTHONPATH=/
 
 # Install tooling
-RUN apk add --no-cache python3 curl bash
+RUN apk add --no-cache python3 curl bash py3-yaml
 
 # Install kind
 ARG KIND_VERSION=v0.27.0
@@ -25,8 +26,8 @@ RUN curl -fsSLo /usr/local/bin/mkcert \
     "https://github.com/FiloSottile/mkcert/releases/download/${MKCERT_VERSION}/mkcert-${MKCERT_VERSION}-linux-amd64" && \
     chmod +x /usr/local/bin/mkcert
 
-# HTTP API server
-COPY server.py /server.py
+# HTTP API server + project module
+COPY server.py projects.py /
 
 EXPOSE 8080
 CMD ["python3", "/server.py"]

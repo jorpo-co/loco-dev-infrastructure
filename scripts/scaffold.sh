@@ -129,6 +129,7 @@ cmd_register() {
     | sed "s/{{host}}/${host}/g" \
     | sed "s/{{http_port}}/${http_port}/g" \
     | sed "s/{{tls_port}}/${tls_port}/g" \
+    | sed "s|{{project_path}}|${project_path}|g" \
     > "$traefik_file"
 
   case "${ssl_mode}" in

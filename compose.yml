@@ -58,8 +58,18 @@ services:
     environment:
       CAROOT: /mkcert-root
       DOCKER_HOST: unix:///var/run/docker.sock
+      HOST_PROJECTS_DIR: ${HOME}/Projects
       INFRA_DIR: /infra
       PROJECTS_DIR: /projects
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.skillrunner.rule=Host(`infra.loco`)
+      - traefik.http.routers.skillrunner.middlewares=infra-redirect-https@file
+      - traefik.http.routers.skillrunner-secure.rule=Host(`infra.loco`)
+      - traefik.http.routers.skillrunner-secure.entrypoints=websecure
+      - traefik.http.routers.skillrunner-secure.tls=true
+      - traefik.http.services.skillrunner.loadbalancer.server.port=8080
+      - traefik.docker.network=loco
     networks:
       - loco
     ports:
