@@ -51,8 +51,8 @@ The templates produce a config with both bare domain and wildcard subdomain
 
 ```bash
 # The cert files registered by _certs-<name>.yml:
-#   certFile: /etc/traefik/certs/<name>.crt
-#   keyFile:  /etc/traefik/certs/<name>.key
+#   certFile: /certs/<name>.crt
+#   keyFile:  /certs/<name>.key
 ```
 
 If you need to regenerate certs for an existing project, delete the

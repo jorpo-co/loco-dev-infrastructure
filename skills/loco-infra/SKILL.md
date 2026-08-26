@@ -70,7 +70,8 @@ just status                           # check DNS + stack + skills state
 1. Check skillrunner: `curl -s http://localhost:9999/health`
 2. Check infra: `curl -s -X POST http://localhost:9999/run -d '{"recipe":"doctor"}'`
 3. Traefik dashboard: http://traefik.loco
-4. DNS problems: `cd ~/Projects/_infra && just status` (or `scripts/dns.sh status`)
+4. **Infra dashboard**: https://infra.loco — project overview, status, start/stop/restart
+5. DNS problems: `cd ~/Projects/_infra && just status` (or `scripts/dns.sh status`)
 
 ## What NOT to do
 
