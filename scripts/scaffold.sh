@@ -9,7 +9,7 @@
 #
 # Required:
 #   --name <name>        Project/service name (also used as container name for compose/site)
-#   --domain <suffix>    Domain suffix, e.g. .jorpo.loco or .loco
+#   --domain <suffix>    Domain suffix, e.g. .loco
 #
 # Options:
 #   --path <path>        Project filesystem path (creates directory if not exists)
@@ -153,7 +153,7 @@ usage() {
   echo ""
   echo "Required:"
   echo "  --name <name>      Project/service name"
-  echo "  --domain <suffix>  Domain suffix (.jorpo.loco, .loco, etc.)"
+  echo "  --domain <suffix>  Domain suffix (e.g. .loco)"
   echo ""
   echo "Options:"
   echo "  --path <path>       Project filesystem path (creates directory if not exists)"
@@ -165,11 +165,11 @@ usage() {
   echo "  --infra-dir <path>  Explicit infra root path (before subcommand)"
   echo ""
   echo "Examples:"
-  echo "  scaffold.sh register --name myapp --domain .jorpo.loco --http-port 3000              # HTTP only"
-  echo "  scaffold.sh register --name myapp --domain .jorpo.loco --http-port 3000 --ssl terminate  # HTTP + HTTPS"
+  echo "  scaffold.sh register --name myapp --domain .loco --http-port 3000                      # HTTP only"
+  echo "  scaffold.sh register --name myapp --domain .loco --http-port 3000 --ssl terminate          # HTTP + HTTPS"
   echo "  scaffold.sh register --name blog --domain .loco --http-port 80"
-  echo "  scaffold.sh register --name mycluster --domain .jorpo.loco --host host.docker.internal --http-port 30080 --tls-port 30443 --ssl passthrough"
-  echo "  scaffold.sh register --name myapp --domain .jorpo.loco --path /projects/jorpo/myapp --http-port 3000"
+  echo "  scaffold.sh register --name mycluster --domain .loco --host host.docker.internal --http-port 30080 --tls-port 30443 --ssl passthrough"
+  echo "  scaffold.sh register --name myapp --domain .loco --path /projects/myapp --http-port 3000"
   exit 1
 }
 

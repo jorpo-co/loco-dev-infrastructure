@@ -41,10 +41,10 @@
 │  │                                                                │       │
 │  │  ┌───────────┐    ┌──────────────┐    ┌──────────────────┐    │       │
 │  │  │  Traefik   │    │   Registry   │    │  overview (opt)  │    │       │
-│  │  │  :80, :443 │    │  :5001/5000  │    │  status.jorpo    │    │       │
+│  │  │  :80, :443 │    │  :5001/5000  │    │  status          │    │       │
 │  │  │  dashboard │    │  registry.   │    │  .loco           │    │       │
 │  │  │  traefik.  │    │  loco        │    │                  │    │       │
-│  │  │  jorpo.loco│    │              │    │                  │    │       │
+│  │  │  loco      │    │              │    │                  │    │       │
 │  │  └─────┬───────┘    └──────────────┘    └──────────────────┘    │       │
 │  │        │                                                        │       │
 │  │        ├── Docker provider ──→ loco containers (labels)     │       │
@@ -57,8 +57,8 @@
 │  │                                                            │               │
 │  │  ┌──────────────────┐  ┌──────────────────┐               │               │
 │  │  │  Compose Project  │  │  Kind Cluster    │               │               │
-│  │  │  concerto.jorpo   │  │  orc.jorpo.loco  │               │               │
-│  │  │  .loco            │  │  (via file       │               │               │
+│  │  │  concerto.loco    │  │  orc.loco         │               │               │
+│  │  │                   │  │  (via file       │               │               │
 │  │  │                   │  │   provider +     │               │               │
 │  │  │                   │  │   host.docker    │               │               │
 │  │  │                   │  │   .internal:     │               │               │
@@ -72,20 +72,19 @@
 
 | Source | DNS resolves to | Hits | Routed to |
 |---|---|---|---|
-| `concerto.jorpo.loco` | `10.254.254.254` | Traefik :80 | Docker label → concerto container |
+| `concerto.loco` | `10.254.254.254` | Traefik :80 | Docker label → concerto container |
 | `registry.loco` | `10.254.254.254` | Traefik :80 | Docker label → registry container |
-| `dash.orc.jorpo.loco` | `10.254.254.254` | Traefik :80 | File provider → `host.docker.internal:30080` → kind node → kind-Traefik → pod |
+| `dash.orc.loco` | `10.254.254.254` | Traefik :80 | File provider → `host.docker.internal:30080` → kind node → kind-Traefik → pod |
 | `traefik.loco` | `10.254.254.254` | Traefik :80 | Traefik dashboard (internal) |
 
 ### Domain Scheme
 
 | Domain | Purpose |
 |---|---|
-| `jorpo.loco` | Root site (Docker Compose project at `~/Projects/sites/jorpo-website/`) |
-| `*.jorpo.loco` | Per-project domains (`concerto.jorpo.loco`, `tasqo.jorpo.loco`, etc.) |
+| `*.loco` | Per-project domains (`concerto.loco`, `myapp.loco`, `orc.loco`, etc.) |
 | `registry.loco` | Docker registry hostname |
 | `traefik.loco` | Traefik dashboard |
-| `status.jorpo.loco` | (optional) Overview page |
+| `status.loco` | (optional) Overview page |
 
 ---
 
@@ -109,7 +108,7 @@ No `/etc/hosts` entries. Any `*.loco` domain resolves to `10.254.254.254` — a 
 ### How It Works
 
 ```
-Browser → DNS lookup for "concerto.jorpo.loco"
+Browser → DNS lookup for "concerto.loco"
   → macOS resolver (/etc/resolver/loco) → dnsmasq (port 53)
     → dnsmasq config: address=/.loco/10.254.254.254
       → returns 10.254.254.254
@@ -159,7 +158,7 @@ _infra/
 │   └── traefik/
 │       ├── traefik.yml      ← Static config
 │       └── services/        ← File provider (compose, site, kind)
-│           ├── orc.yml      ← Example: routes *.orc.jorpo.loco → kind
+│           ├── orc.yml      ← Example: routes *.orc.loco → kind
 │           └── templates/   ← (reserved)
 ├── templates/
 │   ├── compose.yml          ← Template for Docker Compose projects
@@ -267,11 +266,11 @@ Written by `just scaffold-http-only <name> <port>`, `just scaffold-terminate <na
 http:
   routers:
     myapp:
-      rule: "HostRegexp(`{subdomain:.+}.myapp.jorpo.loco`) || Host(`myapp.jorpo.loco`)"
+      rule: "HostRegexp(`{subdomain:.+}.myapp.loco`) || Host(`myapp.loco`)"
       entryPoints: ["web"]
       service: myapp
     myapp-secure:
-      rule: "HostRegexp(`{subdomain:.+}.myapp.jorpo.loco`) || Host(`myapp.jorpo.loco`)"
+      rule: "HostRegexp(`{subdomain:.+}.myapp.loco`) || Host(`myapp.loco`)"
       entryPoints: ["websecure"]
       service: myapp
       tls: {}
@@ -282,7 +281,7 @@ http:
           - url: "http://myapp:3000"
 ```
 
-This gives both `myapp.jorpo.loco` and `*.myapp.jorpo.loco` (e.g. `api.myapp.jorpo.loco`).
+This gives both `myapp.loco` and `*.myapp.loco` (e.g. `api.myapp.loco`).
 
 ### Example: concerto (`compose.yaml`)
 
@@ -345,7 +344,7 @@ provider approach but route via Docker DNS on the `loco` network.
 ### Flow
 
 ```
-Browser → orc.jorpo.loco:80 → Traefik (Docker, port 80)
+Browser → orc.loco:80 → Traefik (Docker, port 80)
   → File provider config (orc.yml)
     → http://host.docker.internal:30080
       → kind node (Docker container, hostPort:30080)
@@ -398,11 +397,11 @@ nodes:
 http:
   routers:
     orc:
-      rule: "HostRegexp(`{subdomain:.+}.orc.jorpo.loco`) || Host(`orc.jorpo.loco`)"
+      rule: "HostRegexp(`{subdomain:.+}.orc.loco`) || Host(`orc.loco`)"
       entryPoints: ["web"]
       service: orc
     orc-secure:
-      rule: "HostRegexp(`{subdomain:.+}.orc.jorpo.loco`) || Host(`orc.jorpo.loco`)"
+      rule: "HostRegexp(`{subdomain:.+}.orc.loco`) || Host(`orc.loco`)"
       entryPoints: ["websecure"]
       service: orc
       tls: {}
@@ -475,9 +474,9 @@ The difference between types is in the variables passed:
 
 | Type | `{{host}}` | `{{domain}}` | Resolution |
 |---|---|---|---|
-| Compose (HTTP only) | `myapp` (container name) | `.jorpo.loco` | Docker DNS on `loco` network |
+| Compose (HTTP only) | `myapp` (container name) | `.loco` | Docker DNS on `loco` network |
 | Site (SSL terminate) | `blog` (container name) | `.loco` | Docker DNS on `loco` network |
-| Kind (SSL passthrough) | `host.docker.internal` | `.jorpo.loco` | Host port (kind uses separate bridge) |
+| Kind (SSL passthrough) | `host.docker.internal` | `.loco` | Host port (kind uses separate bridge) |
 
 Produces a Traefik file provider config with both bare domain and wildcard subdomain.
 
@@ -622,7 +621,7 @@ just doctor
 # Should show all checks green
 
 # Test DNS
-ping -c 1 concerto.jorpo.loco
+ping -c 1 concerto.loco
 # Should resolve to 10.254.254.254
 
 # Test Traefik dashboard
@@ -658,7 +657,7 @@ brew services list | grep dnsmasq
 cat /etc/resolver/loco
 
 # Test resolution
-dig concerto.jorpo.loco @10.254.254.254
+dig concerto.loco @10.254.254.254
 
 # Check loopback alias
 ifconfig lo0 | grep 10.254.254.254
@@ -754,7 +753,7 @@ Ports are allocated on create, freed on delete. The scheme is:
 │
 ├── sites/                     ← Website projects
 │   └── jorpo-website/
-│       └── compose.yaml       ← Host(jorpo.loco)
+│       └── compose.yaml       ← Host(example.loco)
 │
 ├── playground/
 │   └── ...

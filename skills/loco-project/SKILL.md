@@ -27,7 +27,7 @@ Two SSL modes are available, each using a different template:
 Kind clusters use `scaffold-passthrough` internally — handled automatically by `loco-kind`.
 
 The templates produce a config with both bare domain and wildcard subdomain
-(e.g. `myapp.jorpo.loco` + `*.myapp.jorpo.loco`).
+(e.g. `myapp.loco` + `*.myapp.loco`).
 
 ## Variable mapping
 
@@ -35,7 +35,7 @@ The templates use `{{name}}`, `{{domain}}`, `{{host}}`, `{{http_port}}`, `{{tls_
 
 | Type | Recipe | `{{host}}` | `{{domain}}` | Resolution |
 |---|---|---|---|---|
-| Compose | `scaffold-http-only` | container name | `.jorpo.loco` | Docker DNS on `loco` network |
+| Compose | `scaffold-http-only` | container name | `.loco` | Docker DNS on `loco` network |
 | Site | `scaffold-terminate` | container name | `.loco` | Docker DNS on `loco` network |
 
 ## Determining the project directory
@@ -47,7 +47,7 @@ The agent must ensure CWD is set correctly, or pass `--project-dir` via the unde
 |---|---|
 | "create a compose project in this folder" | Use CWD → derives name + category from path |
 | "make a new project called 'myapp' in ./something/" | Resolve to `/projects/<category>/myapp/` |
-| "make me a project called 'concerto'" | Default category `jorpo` → `/projects/jorpo/concerto` |
+| "make me a project called 'concerto'" | Uses CWD to infer category → `/projects/<category>/concerto/` |
 
 ## What the project's compose.yaml needs
 
@@ -79,7 +79,7 @@ no restart needed.
 
 ```bash
 curl -s -X POST http://localhost:9999/run \
-  -d '{"script":"/usr/bin/docker","args":["compose","-f","/projects/jorpo/myapp/compose.yaml","config"]}'
+  -d '{"script":"/usr/bin/docker","args":["compose","-f","/projects/myapp/compose.yaml","config"]}'
 ```
 
 Check: valid YAML, network `loco` is `external: true`, container has `container_name` or

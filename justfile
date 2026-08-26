@@ -161,7 +161,7 @@ doctor:
     @if curl -s -o /dev/null -w "%{http_code}" http://traefik.loco 2>/dev/null | grep -q "200"; then echo "  ✓ Traefik dashboard reachable at http://traefik.loco"; else echo "  ⚠ Traefik dashboard not reachable (may need DNS setup)"; fi
     @echo ""
     @echo "── /etc/hosts conflicts ──"
-    @if grep -q "jorpo.loco" /etc/hosts 2>/dev/null; then echo "  ⚠ /etc/hosts contains jorpo.loco entries — may conflict with dnsmasq"; grep "jorpo.loco" /etc/hosts 2>/dev/null | sed 's/^/    /'; else echo "  ✓ No jorpo.loco entries in /etc/hosts"; fi
+    @if grep -q "\.loco" /etc/hosts 2>/dev/null; then echo "  ⚠ /etc/hosts contains .loco entries — may conflict with dnsmasq"; grep "\.loco" /etc/hosts 2>/dev/null | sed 's/^/    /'; else echo "  ✓ No .loco entries in /etc/hosts"; fi
     @echo ""
     @echo "═══ Doctor complete ═══"
 

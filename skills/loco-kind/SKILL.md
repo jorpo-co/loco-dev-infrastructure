@@ -1,6 +1,6 @@
 ---
 name: loco-kind
-description: "Create, delete, import, and manage kind (Kubernetes-in-Docker) clusters integrated with the user's local Traefik router at *.<cluster>.jorpo.loco. Handles deterministic port allocation (30080+ / 30443+), writes the Traefik file-provider config, configures the containerd registry mirror, and validates each step. The import command registers an existing cluster without creating it. Runs via the skillrunner HTTP API at localhost:9999."
+description: "Create, delete, import, and manage kind (Kubernetes-in-Docker) clusters integrated with the user's local Traefik router at *.<cluster>.loco. Handles deterministic port allocation (30080+ / 30443+), writes the Traefik file-provider config, configures the containerd registry mirror, and validates each step. The import command registers an existing cluster without creating it. Runs via the skillrunner HTTP API at localhost:9999."
 ---
 
 # Loco Kind
@@ -65,8 +65,8 @@ HTTP: 30080+N, TLS: 30443+N. Ports freed on delete. Never assign manually.
 
 | Cluster | HTTP | TLS | Domain |
 |---|---|---|---|
-| orc | 30080 | 30443 | `*.orc.jorpo.loco` |
-| next | 30081 | 30444 | `*.next.jorpo.loco` |
+| orc | 30080 | 30443 | `*.orc.loco` |
+| next | 30081 | 30444 | `*.next.loco` |
 
 ## After creating or importing
 
@@ -76,7 +76,7 @@ curl -s -X POST http://localhost:9999/run \
   -d '{"script":"/usr/local/bin/kind","args":["get","kubeconfig","--name","mycluster"]}'
 
 # Test routing (needs in-cluster ingress):
-curl -H "Host: myservice.mycluster.jorpo.loco" http://10.254.254.254/
+curl -H "Host: myservice.mycluster.loco" http://10.254.254.254/
 ```
 
 ## Important notes

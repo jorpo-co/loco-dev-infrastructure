@@ -140,13 +140,13 @@ _register_traefik_route() {
   local scaffold="${SCRIPT_DIR}/scaffold.sh"
   if [ ! -f "$scaffold" ]; then
     echo "  ✗ scaffold.sh not found at ${scaffold}"
-    echo "  Register manually: scaffold-passthrough ${name} .jorpo.loco ${http_port} ${tls_port}"
+    echo "  Register manually: scaffold-passthrough ${name} .loco ${http_port} ${tls_port}"
     return 1
   fi
 
   "$scaffold" --infra-dir "$PROJECT_DIR" register \
     --name "$name" \
-    --domain ".jorpo.loco" \
+    --domain ".loco" \
     --host "host.docker.internal" \
     --http-port "$http_port" \
     --tls-port "$tls_port" \
@@ -280,7 +280,7 @@ CONFIG
   echo "═══ Kind cluster '${name}' created ═══"
   echo "  HTTP:  host.docker.internal:${http_port}"
   echo "  TLS:   host.docker.internal:${tls_port}"
-  echo "  Domain: *.${name}.jorpo.loco → ${name}.jorpo.loco"
+  echo "  Domain: *.${name}.loco"
 
   _register_traefik_route "$name" "$http_port" "$tls_port"
 
@@ -377,7 +377,7 @@ CONFIG
   echo "═══ Kind cluster '${name}' imported ═══"
   echo "  HTTP:  host.docker.internal:${http_port}"
   echo "  TLS:   host.docker.internal:${tls_port}"
-  echo "  Domain: *.${name}.jorpo.loco → ${name}.jorpo.loco"
+  echo "  Domain: *.${name}.loco"
 
   _register_traefik_route "$name" "$http_port" "$tls_port"
 }
@@ -469,7 +469,7 @@ name = sys.argv[1]
 print(data.get(name, {}).get("tls", "?"))
 PYEOF
 )" "$cluster" <<< "$allocs" 2>/dev/null)
-      echo "    ${cluster}: HTTP=${http_port} TLS=${tls_port} → *.${cluster}.jorpo.loco"
+      echo "    ${cluster}: HTTP=${http_port} TLS=${tls_port} → *.${cluster}.loco"
     done
   fi
 
@@ -505,7 +505,7 @@ cmd_scaffold() {
   else
     if [ $# -lt 1 ]; then
       echo "Usage: $(basename "$0") scaffold <name> [category]"
-      echo "  name      Cluster name (also becomes the domain: *.name.jorpo.loco)"
+      echo "  name      Cluster name (also becomes the domain: *.name.loco)"
       echo "  category  Subfolder under ~/Projects/ (default: inferred from PWD)"
       echo ""
       echo "Or with --project-dir (flags before subcommand):"
@@ -557,7 +557,7 @@ cmd_scaffold() {
   echo ""
   echo "═══ Kind project '${name}' scaffolded ═══"
   echo "  Location: ${project_dir}"
-  echo "  Domain:   *.${name}.jorpo.loco"
+  echo "  Domain:   *.${name}.loco"
   echo "  Next:     kind-create ${name}"
 }
 
