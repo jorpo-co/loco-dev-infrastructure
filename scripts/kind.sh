@@ -46,7 +46,7 @@ fi
 
 # ── Config (env defaults, computed paths) ──
 PORT_ALLOCATIONS="${PROJECT_DIR}/${PORT_ALLOCATIONS_RELPATH:-var/port-allocations.json}"
-TRAEFIK_CONFIG_DIR="${PROJECT_DIR}/${TRAEFIK_CONFIG_SUBDIR:-etc/traefik/services}"
+TRAEFIK_CONFIG_DIR="${PROJECT_DIR}/${TRAEFIK_CONFIG_SUBDIR:-etc/traefik/configs}"
 TEMPLATE_DIR="${PROJECT_DIR}/${TEMPLATES_RELPATH:-templates}"
 KIND_CONFIG_TEMPLATE="${TEMPLATE_DIR}/kind-config.yaml"
 HTTP_PORT_START="${KIND_HTTP_PORT_START:-30080}"

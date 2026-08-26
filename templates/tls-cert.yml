@@ -1,4 +1,4 @@
 tls:
   certificates:
-    - certFile: /etc/traefik/certs/{{name}}.crt
-      keyFile: /etc/traefik/certs/{{name}}.key
+    - certFile: /certs/{{name}}.crt
+      keyFile: /certs/{{name}}.key

@@ -1,12 +1,12 @@
 ---
 name: loco-project
-description: "Register local Docker Compose / site projects with the infra Traefik router using the file provider. Writes a Traefik config to etc/traefik/services/<name>.yml so the route is managed by infra, not by Docker labels. No loco.compose.yaml files are generated. Use whenever the user asks to create a new project, expose a service, or give something a local domain. Runs via the skillrunner HTTP API at localhost:9999."
+description: "Register local Docker Compose / site projects with the infra Traefik router using the file provider. Writes a Traefik config to etc/traefik/configs/<name>.yml so the route is managed by infra, not by Docker labels. No loco.compose.yaml files are generated. Use whenever the user asks to create a new project, expose a service, or give something a local domain. Runs via the skillrunner HTTP API at localhost:9999."
 ---
 
 # Loco Project
 
 The user organises projects under `~/Projects/<category>/<name>/`. Each project that needs
-networking gets a Traefik file provider config in `etc/traefik/services/<name>.yml` inside
+networking gets a Traefik file provider config in `etc/traefik/configs/<name>.yml` inside
 the infra stack. No `loco.compose.yaml` files — the project's own compose file just needs to
 join the `loco` network.
 
@@ -28,7 +28,7 @@ When using `scaffold-terminate`, TLS certificates are automatically generated vi
 mkcert using the root CA stored in `etc/certs/ca/` (initialised by `just setup` or
 `just certs-init`). Certs are written to `etc/certs/<name>.crt` + `.key`, and a
 Traefik certificate registration file is written to
-`etc/traefik/services/_certs-<name>.yml`. |
+`etc/traefik/configs/_certs-<name>.yml`. |
 
 Kind clusters use `scaffold-passthrough` internally — handled automatically by `loco-kind`.
 
@@ -45,7 +45,7 @@ The templates produce a config with both bare domain and wildcard subdomain
    `<name><domain>` and `*<name><domain>`.
 3. The cert is written to `etc/certs/<name>.crt` + `.key`.
 4. A Traefik file provider config is written to
-   `etc/traefik/services/_certs-<name>.yml` registering the cert.
+   `etc/traefik/configs/_certs-<name>.yml` registering the cert.
 5. Traefik's TLS router (`tls: {}` in the terminated config) auto-matches
    the cert by SNI — no per-router cert configuration needed.
 
@@ -104,7 +104,7 @@ networks:
 
 ## Modifying an existing project
 
-Edit the config in `etc/traefik/services/<name>.yml` directly. Traefik watches for changes —
+Edit the config in `etc/traefik/configs/<name>.yml` directly. Traefik watches for changes —
 no restart needed.
 
 ## Validating output

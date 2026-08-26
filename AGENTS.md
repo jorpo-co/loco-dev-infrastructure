@@ -44,7 +44,7 @@ DNS is host-only (needs sudo + brew): `cd ~/Projects/_infra && just status` (or 
 
 ### loco-project — Register projects with Traefik
 
-Writes a Traefik file provider config to `etc/traefik/services/<name>.yml` (no loco.compose.yaml).
+Writes a Traefik file provider config to `etc/traefik/configs/<name>.yml` (no loco.compose.yaml).
 All types use the file provider — no Docker labels.
 
 Three SSL modes are available:
@@ -55,7 +55,7 @@ Three SSL modes are available:
 When using `scaffold-terminate`, TLS certificates are generated automatically via
 mkcert (using the root CA in `etc/certs/ca/` initialized by `just setup`).
 Certs are stored in `etc/certs/<name>.{crt,key}` and registered with Traefik
-via `etc/traefik/services/_certs-<name>.yml`.
+via `etc/traefik/configs/_certs-<name>.yml`.
 
 ```bash
 curl -s -X POST http://localhost:9999/run -d '{"recipe":"scaffold-http-only","args":["myapp","3000"]}'

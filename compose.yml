@@ -13,6 +13,11 @@ services:
       - traefik.enable=true
       - traefik.http.routers.registry.rule=Host(`registry.loco`) && PathPrefix(`/v2`)
       - traefik.http.routers.registry.priority=10
+      - traefik.http.routers.registry.middlewares=infra-redirect-https@file
+      - traefik.http.routers.registry-secure.rule=Host(`registry.loco`) && PathPrefix(`/v2`)
+      - traefik.http.routers.registry-secure.entrypoints=websecure
+      - traefik.http.routers.registry-secure.tls=true
+      - traefik.http.routers.registry-secure.priority=10
       - traefik.http.services.registry.loadbalancer.server.port=5000
       - traefik.docker.network=loco
     networks:
@@ -31,13 +36,17 @@ services:
       DISABLE_USER_FORCE_LOGIN: 'true'
       NGINX_PROXY_PASS_URL: http://registry:5000
       REGISTRY_TITLE: Loco Registry
-      REGISTRY_URL: http://registry.loco
+      REGISTRY_URL: https://registry.loco
       SHOW_CONTENT_DIGEST: 'true'
       SINGLE_REGISTRY: 'true'
     image: joxit/docker-registry-ui:latest
     labels:
       - traefik.enable=true
       - traefik.http.routers.registry-ui.rule=Host(`registry.loco`)
+      - traefik.http.routers.registry-ui.middlewares=infra-redirect-https@file
+      - traefik.http.routers.registry-ui-secure.rule=Host(`registry.loco`)
+      - traefik.http.routers.registry-ui-secure.entrypoints=websecure
+      - traefik.http.routers.registry-ui-secure.tls=true
       - traefik.http.services.registry-ui.loadbalancer.server.port=80
       - traefik.docker.network=loco
     networks:
@@ -71,6 +80,11 @@ services:
       - traefik.http.routers.dashboard.rule=Host(`traefik.loco`)
       - traefik.http.routers.dashboard.service=api@internal
       - traefik.http.routers.dashboard.entrypoints=web
+      - traefik.http.routers.dashboard.middlewares=infra-redirect-https@file
+      - traefik.http.routers.dashboard-secure.rule=Host(`traefik.loco`)
+      - traefik.http.routers.dashboard-secure.service=api@internal
+      - traefik.http.routers.dashboard-secure.entrypoints=websecure
+      - traefik.http.routers.dashboard-secure.tls=true
       - traefik.docker.network=loco
     networks:
       - loco
@@ -81,6 +95,6 @@ services:
     restart: unless-stopped
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
-      - ./etc/certs:/etc/traefik/certs:ro
+      - ./etc/certs:/certs:ro
       - ./etc/traefik:/etc/traefik:ro
       - ./var/logs/:/var/log/traefik/:rw

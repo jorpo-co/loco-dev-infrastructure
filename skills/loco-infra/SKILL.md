@@ -60,7 +60,7 @@ just status                           # check DNS + stack + skills state
 | Infra root | `/infra` | `~/Projects/_infra` |
 | Compose file | `/infra/compose.yml` | `~/Projects/_infra/compose.yml` |
 | Traefik static config | `/infra/etc/traefik/traefik.yml` | `~/Projects/_infra/etc/traefik/traefik.yml` |
-| Traefik providers | `/infra/etc/traefik/services/` | `~/Projects/_infra/etc/traefik/services/` |
+| Traefik providers | `/infra/etc/traefik/configs/` | `~/Projects/_infra/etc/traefik/configs/` |
 | Templates | `/infra/templates/` | `~/Projects/_infra/templates/` |
 | Port allocations | `/infra/var/port-allocations.json` | `~/Projects/_infra/var/port-allocations.json` |
 | All projects | `/projects/` | `~/Projects/` |
@@ -75,6 +75,6 @@ just status                           # check DNS + stack + skills state
 ## What NOT to do
 
 - **Do NOT** edit `/etc/hosts` for `.loco` domains — DNS is handled by dnsmasq.
-- **Do NOT** hand-edit `/infra/etc/traefik/services/*.yml` for kind clusters — use `loco-kind`.
+- **Do NOT** hand-edit `/infra/etc/traefik/configs/*.yml` for kind clusters — use `loco-kind`.
 - **Do NOT** hand-write compose networking files — use `loco-project`.
 - **Do NOT** change port allocations by hand.

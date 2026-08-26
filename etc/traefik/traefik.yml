@@ -9,7 +9,7 @@ providers:
     network: loco
     exposedByDefault: false
   file:
-    directory: /etc/traefik/services/
+    directory: /etc/traefik/configs/
     watch: true
 
 log:

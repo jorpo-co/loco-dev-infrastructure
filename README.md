@@ -48,7 +48,7 @@
 │  │  └─────┬───────┘    └──────────────┘    └──────────────────┘    │       │
 │  │        │                                                        │       │
 │  │        ├── Docker provider ──→ loco containers (labels)     │       │
-│  │        └── File provider  ──→ etc/traefik/services/*.yml       │       │
+│  │        └── File provider  ──→ etc/traefik/configs/*.yml       │       │
 │  └────────┼─────────────────────────────────────────────────────────┘       │
 │           │                                                                  │
 │           ▼                                                                  │
@@ -93,7 +93,7 @@
 1. **Deterministic** — Every script is idempotent. Running it twice produces the same result.
 2. **Self-contained** — Everything lives in `~/Projects/_infra/`. Skills are symlinked to pi.
 3. **No /etc/hosts editing** — dnsmasq handles wildcard DNS. No manual entries.
-4. **Per-project sovereignty** — Folder structure is purely organisational. Networking config lives in each project's `compose.yaml` or in `_infra/etc/traefik/services/` (for all types).
+4. **Per-project sovereignty** — Folder structure is purely organisational. Networking config lives in each project's `compose.yaml` or in `_infra/etc/traefik/configs/` (for all types).
 5. **Validation at every step** — Scripts check preconditions, validate outputs, and fail early.
 6. **Portable across projects** — Same template, same labels, same pattern for everything.
 
@@ -157,7 +157,7 @@ _infra/
 │   │       └── loco
 │   └── traefik/
 │       ├── traefik.yml      ← Static config
-│       └── services/        ← File provider (compose, site, kind)
+│       └── configs/        ← File provider (compose, site, kind)
 │           ├── orc.yml      ← Example: routes *.orc.loco → kind
 │           └── templates/   ← (reserved)
 ├── templates/
@@ -198,7 +198,7 @@ Key details:
 
 Volume mounts:
 - Traefik static config: `./etc/traefik:/etc/traefik:ro`
-- File provider configs: part of the `etc/traefik` mount (inside `/etc/traefik/services/`)
+- File provider configs: part of the `etc/traefik` mount (inside `/etc/traefik/configs/`)
 - Logs: `./var/logs/:/var/log/traefik/:rw`
 - Registry storage: `./var/registry:/var/lib/registry:rw`
 - Docker socket: `/var/run/docker.sock:/var/run/docker.sock`
@@ -218,7 +218,7 @@ providers:
     network: loco
     exposedByDefault: false
   file:
-    directory: /etc/traefik/services/
+    directory: /etc/traefik/configs/
     watch: true
 
 log:
@@ -249,12 +249,12 @@ just restart  # docker compose restart
 ### The Pattern
 
 All project types — compose, kind, and site — use the **Traefik file provider** for routing.
-Config files live in `etc/traefik/services/` inside the infra stack. No Docker labels needed.
+Config files live in `etc/traefik/configs/` inside the infra stack. No Docker labels needed.
 
 Every project that needs networking:
 
 1. Joins the external `loco` network (adds `networks: [loco]` to its own `compose.yaml`)
-2. The scaffold step writes a Traefik file provider config to `etc/traefik/services/<name>.yml`
+2. The scaffold step writes a Traefik file provider config to `etc/traefik/configs/<name>.yml`
 3. No `loco.compose.yaml` files, no Traefik labels
 
 ### Traefik File Provider Config
@@ -262,7 +262,7 @@ Every project that needs networking:
 Written by `just scaffold-http-only <name> <port>`, `just scaffold-terminate <name> <port>`, or `just scaffold-passthrough <name> <domain> <http_port> <tls_port>`:
 
 ```yaml
-# _infra/etc/traefik/services/myapp.yml
+# _infra/etc/traefik/configs/myapp.yml
 http:
   routers:
     myapp:
@@ -325,7 +325,7 @@ networks:
 
 ### How Discovery Works
 
-1. `just scaffold-http-only <name> <port>` (or `scaffold-terminate`/`scaffold-passthrough`) writes a file provider config to `etc/traefik/services/<name>.yml`
+1. `just scaffold-http-only <name> <port>` (or `scaffold-terminate`/`scaffold-passthrough`) writes a file provider config to `etc/traefik/configs/<name>.yml`
 2. Traefik watches this directory and loads the route dynamically
 3. The project container joins the `loco` network via its own `compose.yaml`
 4. Docker DNS resolves the container name on `loco` — no labels needed
@@ -337,7 +337,7 @@ networks:
 ### Why File Provider
 
 Kind clusters run on the `kind` Docker bridge network, not `loco`. They can't reach Traefik
-via Docker DNS. Instead, each kind cluster gets a config file in `etc/traefik/services/`
+via Docker DNS. Instead, each kind cluster gets a config file in `etc/traefik/configs/`
 that routes to `host.docker.internal:<http_port>`. Composer projects use the same file
 provider approach but route via Docker DNS on the `loco` network.
 
@@ -358,9 +358,9 @@ Ports are allocated deterministically. Each kind cluster gets a unique HTTP and 
 
 | Cluster | HTTP Host Port | TLS Host Port | Config File |
 |---|---|---|---|
-| `orc` | 30080 | 30443 | `etc/traefik/services/orc.yml` |
-| `next-cluster` | 30081 | 30444 | `etc/traefik/services/next-cluster.yml` |
-| `another` | 30082 | 30445 | `etc/traefik/services/another.yml` |
+| `orc` | 30080 | 30443 | `etc/traefik/configs/orc.yml` |
+| `next-cluster` | 30081 | 30444 | `etc/traefik/configs/next-cluster.yml` |
+| `another` | 30082 | 30445 | `etc/traefik/configs/another.yml` |
 
 Ports are tracked in `var/port-allocations.json`:
 
@@ -393,7 +393,7 @@ nodes:
 ### Example: orc Cluster
 
 ```yaml
-# etc/traefik/services/orc.yml
+# etc/traefik/configs/orc.yml
 http:
   routers:
     orc:
@@ -696,7 +696,7 @@ curl -H "Host: registry.loco" http://10.254.254.254/v2/_catalog
 
 ```bash
 # Check file provider config exists
-ls -la etc/traefik/services/
+ls -la etc/traefik/configs/
 
 # Check port allocation
 cat var/port-allocations.json
@@ -714,7 +714,7 @@ curl http://host.docker.internal:<port>/
 
 | Cluster | HTTP | TLS | Config File |
 |---|---|---|---|
-| orc | 30080 | 30443 | etc/traefik/services/orc.yml |
+| orc | 30080 | 30443 | etc/traefik/configs/orc.yml |
 | — | 30081 | 30444 | next available |
 | — | 30082 | 30445 | next available |
 

@@ -44,7 +44,7 @@ curl -s -X POST http://localhost:9999/run -d '{"recipe":"kind-create","args":["m
 This single command:
 - Allocates HTTP/TLS ports
 - Creates the kind cluster
-- Writes the Traefik file provider config to `/infra/etc/traefik/services/mycluster.yml`
+- Writes the Traefik file provider config to `/infra/etc/traefik/configs/mycluster.yml`
 - Configures the containerd registry mirror
 
 ### Import (for existing clusters)
@@ -83,6 +83,6 @@ curl -H "Host: myservice.mycluster.loco" http://10.254.254.254/
 
 - **External Traefik owns host ports 80/443** — kind clusters must NOT bind them.
 - **Inside the cluster** needs its own ingress controller (Traefik or nginx-ingress) with `NodePort: 30080/30443` (the containerPort, NOT hostPort).
-- **Do NOT** hand-edit `/infra/etc/traefik/services/*.yml` — use `kind-create`/`kind-import`.
+- **Do NOT** hand-edit `/infra/etc/traefik/configs/*.yml` — use `kind-create`/`kind-import`.
 - **Do NOT** manually reserve ports — allocation is automatic and tracked.
 - **Do NOT** mount `loco` network into the cluster — kind uses its own bridge.

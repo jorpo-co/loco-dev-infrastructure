@@ -50,7 +50,7 @@ if [ -f "${PROJECT_DIR}/.env.defaults" ]; then
 fi
 
 TEMPLATE_DIR="${PROJECT_DIR}/${TEMPLATES_RELPATH:-templates}"
-TRAEFIK_CONFIG_DIR="${PROJECT_DIR}/${TRAEFIK_CONFIG_SUBDIR:-etc/traefik/services}"
+TRAEFIK_CONFIG_DIR="${PROJECT_DIR}/${TRAEFIK_CONFIG_SUBDIR:-etc/traefik/configs}"
 
 # ──────────────────────────────────────────────
 # Register
@@ -142,7 +142,7 @@ cmd_register() {
 
       mkcert -cert-file "${CERTS_DIR}/${name}.crt" \
              -key-file "${CERTS_DIR}/${name}.key" \
-             "${name}${domain}" "*${name}${domain}"
+             "${name}${domain}" "*.${name}${domain}"
 
       echo "  ✓ TLS certs: ${CERTS_DIR}/${name}.{crt,key}"
 
