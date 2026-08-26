@@ -47,6 +47,7 @@ services:
     build: ./skillrunner
     container_name: loco-skillrunner
     environment:
+      CAROOT: /mkcert-root
       DOCKER_HOST: unix:///var/run/docker.sock
       INFRA_DIR: /infra
       PROJECTS_DIR: /projects
@@ -57,6 +58,7 @@ services:
     restart: unless-stopped
     volumes:
       - .:/infra:rw
+      - ./etc/certs/ca:/mkcert-root:ro
       - /var/run/docker.sock:/var/run/docker.sock:rw
       - ${HOME}/Projects:/projects:rw
   traefik:
@@ -79,5 +81,6 @@ services:
     restart: unless-stopped
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./etc/certs:/etc/traefik/certs:ro
       - ./etc/traefik:/etc/traefik:ro
       - ./var/logs/:/var/log/traefik/:rw

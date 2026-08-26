@@ -1,3 +1,4 @@
 .env
 *.log
 .DS_Store
+etc/certs/ca/rootCA-key.pem

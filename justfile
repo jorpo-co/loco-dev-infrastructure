@@ -13,6 +13,7 @@ default:
 # install requirements
 setup:
     @{{ SCRIPTS_DIR }}/dns.sh install
+    @just certs-init
     @docker compose -f compose.yml pull \
       --ignore-pull-failures \
       --include-deps \
@@ -112,6 +113,13 @@ kind-delete name:
 kind-import name:
     @{{ SCRIPTS_DIR }}/kind.sh import "{{ name }}"
 
+# initialize mkcert root CA (runs on host, stores CA in etc/certs/ca/)
+certs-init:
+    @mkdir -p {{ PROJECT_DIR }}/etc/certs/ca
+    @CAROOT={{ PROJECT_DIR }}/etc/certs/ca mkcert -install
+    @echo "  ✓ mkcert CA initialized in etc/certs/ca/"
+    @echo "  ✓ CA installed in host trust store"
+
 # list all kind clusters with port mappings
 kind-list:
     @{{ SCRIPTS_DIR }}/kind.sh list
@@ -179,7 +187,9 @@ env:
     @echo "  Port allocs:  {{ PROJECT_DIR }}/var/port-allocations.json"
     @echo "  Skills:       {{ PROJECT_DIR }}/skills/"
     @echo ""
-    @echo "  DNS:          *.loco → 10.254.254.254"
+    @echo "  Certs:        {{ PROJECT_DIR }}/etc/certs/"
+  @echo "    CA root:    {{ PROJECT_DIR }}/etc/certs/ca/
+  @echo "  DNS:          *.loco → 10.254.254.254"
     @echo "  Traefik:      http://traefik.loco"
     @echo "  Registry:     http://registry.loco / localhost:5001"
     @echo "  Skillrunner:  http://localhost:9999"

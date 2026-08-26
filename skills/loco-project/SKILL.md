@@ -22,12 +22,44 @@ Two SSL modes are available, each using a different template:
 | Mode | Recipe | Template | Use case |
 |---|---|---|---|
 | HTTP only | `scaffold-http-only` | `traefik-http-only.yml` | Compose projects (internal) |
-| SSL terminate | `scaffold-terminate` | `traefik-terminate.yml` | Public sites (`.loco` TLD) |
+| SSL terminate | `scaffold-terminate` | `traefik-terminate.yml` | Public sites (`.loco` TLD)
+
+When using `scaffold-terminate`, TLS certificates are automatically generated via
+mkcert using the root CA stored in `etc/certs/ca/` (initialised by `just setup` or
+`just certs-init`). Certs are written to `etc/certs/<name>.crt` + `.key`, and a
+Traefik certificate registration file is written to
+`etc/traefik/services/_certs-<name>.yml`. |
 
 Kind clusters use `scaffold-passthrough` internally — handled automatically by `loco-kind`.
 
 The templates produce a config with both bare domain and wildcard subdomain
 (e.g. `myapp.loco` + `*.myapp.loco`).
+
+## TLS certificates
+
+`scaffold-terminate` generates TLS certificates automatically:
+
+1. **Prerequisite**: `just certs-init` (runs as part of `just setup`) creates a
+   mkcert root CA in `etc/certs/ca/` and installs it in the host's trust store.
+2. On scaffold, `mkcert` generates a cert signed by that CA for
+   `<name><domain>` and `*<name><domain>`.
+3. The cert is written to `etc/certs/<name>.crt` + `.key`.
+4. A Traefik file provider config is written to
+   `etc/traefik/services/_certs-<name>.yml` registering the cert.
+5. Traefik's TLS router (`tls: {}` in the terminated config) auto-matches
+   the cert by SNI — no per-router cert configuration needed.
+
+```bash
+# The cert files registered by _certs-<name>.yml:
+#   certFile: /etc/traefik/certs/<name>.crt
+#   keyFile:  /etc/traefik/certs/<name>.key
+```
+
+If you need to regenerate certs for an existing project, delete the
+`_certs-<name>.yml` and `.crt`/`.key` files and re-run the scaffold recipe.
+
+> **Note**: `etc/certs/ca/rootCA-key.pem` is gitignored — it's the private key
+> of the local development CA. The public cert `rootCA.pem` can be committed.
 
 ## Variable mapping
 

@@ -19,6 +19,12 @@ RUN curl -fsSL \
     -o /usr/local/bin/kubectl && \
     chmod +x /usr/local/bin/kubectl
 
+# Install mkcert (single Go binary, Alpine-compatible)
+ARG MKCERT_VERSION=v1.4.4
+RUN curl -fsSLo /usr/local/bin/mkcert \
+    "https://github.com/FiloSottile/mkcert/releases/download/${MKCERT_VERSION}/mkcert-${MKCERT_VERSION}-linux-amd64" && \
+    chmod +x /usr/local/bin/mkcert
+
 # HTTP API server
 COPY server.py /server.py
 

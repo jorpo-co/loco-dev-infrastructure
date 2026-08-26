@@ -133,7 +133,28 @@ cmd_register() {
 
   case "${ssl_mode}" in
     "")          echo "  ✓ No SSL (HTTP only)" ;;
-    terminate)   echo "  ✓ SSL terminate (Traefik handles HTTPS, forwards HTTP to backend)" ;;
+    terminate)
+      echo "  ✓ SSL terminate (Traefik handles HTTPS, forwards HTTP to backend)"
+
+      # ── Generate TLS certs with mkcert ──
+      CERTS_DIR="${PROJECT_DIR}/${CERTS_RELPATH:-etc/certs}"
+      mkdir -p "$CERTS_DIR"
+
+      mkcert -cert-file "${CERTS_DIR}/${name}.crt" \
+             -key-file "${CERTS_DIR}/${name}.key" \
+             "${name}${domain}" "*${name}${domain}"
+
+      echo "  ✓ TLS certs: ${CERTS_DIR}/${name}.{crt,key}"
+
+      # ── Write TLS cert registration (auto-matched by Traefik) ──
+      local cert_tpl="${TEMPLATE_DIR}/tls-cert.yml"
+      if [ -f "$cert_tpl" ]; then
+        cat "$cert_tpl" \
+          | sed "s/{{name}}/${name}/g" \
+          > "${TRAEFIK_CONFIG_DIR}/_certs-${name}.yml"
+        echo "  ✓ Cert reg:  ${TRAEFIK_CONFIG_DIR}/_certs-${name}.yml"
+      fi
+      ;;
     passthrough) echo "  ✓ SSL passthrough (Traefik forwards TLS directly to backend)" ;;
   esac
 

@@ -52,6 +52,11 @@ Three SSL modes are available:
 - **SSL terminate** (Traefik handles HTTPS, forwards HTTP to backend): `scaffold-terminate`
 - **SSL passthrough** (TLS forwarded directly to backend, for kind clusters): `scaffold-passthrough`
 
+When using `scaffold-terminate`, TLS certificates are generated automatically via
+mkcert (using the root CA in `etc/certs/ca/` initialized by `just setup`).
+Certs are stored in `etc/certs/<name>.{crt,key}` and registered with Traefik
+via `etc/traefik/services/_certs-<name>.yml`.
+
 ```bash
 curl -s -X POST http://localhost:9999/run -d '{"recipe":"scaffold-http-only","args":["myapp","3000"]}'
 curl -s -X POST http://localhost:9999/run -d '{"recipe":"scaffold-terminate","args":["blog","80"]}'
