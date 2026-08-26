@@ -2,7 +2,7 @@
 
 > A self-contained, deterministic local development environment for Docker Compose and kind
 > (Kubernetes-in-Docker) projects. One stack to route, register, and orchestrate everything
-> running on `*.jorpo.loco` and `*.loco`.
+> running on `*.loco`.
 
 ---
 
@@ -10,7 +10,7 @@
 
 1. [Architecture Overview](#1-architecture-overview)
 2. [Design Principles](#2-design-principles)
-3. [DNS: Wildcard Resolution for *.jorpo.loco](#3-dns-wildcard-resolution-for-jorpoloco)
+3. [DNS: Wildcard Resolution for *.loco](#3-dns-wildcard-resolution-for-loco)
 4. [The _infra/ Stack](#4-the-infra-stack)
 5. [How Docker Compose Projects Connect](#5-how-docker-compose-projects-connect)
 6. [How Kind Clusters Connect](#6-how-kind-clusters-connect)
@@ -31,7 +31,7 @@
 │                                                                         │
 │  ┌──────────────────────────────────────────────────────────────┐       │
 │  │  Homebrew dnsmasq                                              │       │
-│  │  *.jorpo.loco → 10.254.254.254                                 │       │
+│  │  *.loco → 10.254.254.254                                 │       │
 │  │  *.loco       → 10.254.254.254                                 │       │
 │  └──────────────────────┬───────────────────────────────────────┘       │
 │                          │ DNS query                                     │
@@ -75,7 +75,7 @@
 | `concerto.jorpo.loco` | `10.254.254.254` | Traefik :80 | Docker label → concerto container |
 | `registry.loco` | `10.254.254.254` | Traefik :80 | Docker label → registry container |
 | `dash.orc.jorpo.loco` | `10.254.254.254` | Traefik :80 | File provider → `host.docker.internal:30080` → kind node → kind-Traefik → pod |
-| `traefik.jorpo.loco` | `10.254.254.254` | Traefik :80 | Traefik dashboard (internal) |
+| `traefik.loco` | `10.254.254.254` | Traefik :80 | Traefik dashboard (internal) |
 
 ### Domain Scheme
 
@@ -84,7 +84,7 @@
 | `jorpo.loco` | Root site (Docker Compose project at `~/Projects/sites/jorpo-website/`) |
 | `*.jorpo.loco` | Per-project domains (`concerto.jorpo.loco`, `tasqo.jorpo.loco`, etc.) |
 | `registry.loco` | Docker registry hostname |
-| `traefik.jorpo.loco` | Traefik dashboard |
+| `traefik.loco` | Traefik dashboard |
 | `status.jorpo.loco` | (optional) Overview page |
 
 ---
@@ -100,18 +100,18 @@
 
 ---
 
-## 3. DNS: Wildcard Resolution for *.jorpo.loco
+## 3. DNS: Wildcard Resolution for *.loco
 
 ### Why
 
-No `/etc/hosts` entries. Any `*.jorpo.loco` domain resolves to `10.254.254.254` — a dedicated loopback alias that Traefik binds to.
+No `/etc/hosts` entries. Any `*.loco` domain resolves to `10.254.254.254` — a dedicated loopback alias that Traefik binds to.
 
 ### How It Works
 
 ```
 Browser → DNS lookup for "concerto.jorpo.loco"
-  → macOS resolver (/etc/resolver/jorpo.loco) → dnsmasq (port 53)
-    → dnsmasq config: address=/.jorpo.loco/10.254.254.254
+  → macOS resolver (/etc/resolver/loco) → dnsmasq (port 53)
+    → dnsmasq config: address=/.loco/10.254.254.254
       → returns 10.254.254.254
         → Browser connects to 10.254.254.254:80 → Traefik
 ```
@@ -121,8 +121,7 @@ Browser → DNS lookup for "concerto.jorpo.loco"
 | Component | Location | Purpose |
 |---|---|---|
 | Loopback alias | `lo0` alias `10.254.254.254` | Dedicated IP for DNS traffic |
-| dnsmasq config | `/usr/local/etc/dnsmasq.d/loco.conf` | `address=/.jorpo.loco/10.254.254.254` and `address=/.loco/10.254.254.254` |
-| macOS resolver | `/etc/resolver/jorpo.loco` | `nameserver 10.254.254.254` |
+| dnsmasq config | `/usr/local/etc/dnsmasq.d/loco.conf` | `address=/.loco/10.254.254.254` |
 | macOS resolver | `/etc/resolver/loco` | `nameserver 10.254.254.254` |
 | Launch daemon | `/Library/LaunchDaemons/com.loco.infra.plist` | Persists loopback alias across reboots |
 
@@ -132,7 +131,7 @@ Browser → DNS lookup for "concerto.jorpo.loco"
 # scripts/dns.sh install
 # Step 1: Create loopback alias (via launchd plist)
 # Step 2: brew install dnsmasq (if not installed)
-# Step 3: Write dnsmasq config for .jorpo.loco and .loco
+# Step 3: Write dnsmasq config for .loco
 # Step 4: Create macOS resolver files
 # Step 5: Restart dnsmasq
 # Step 6: Verify resolution
@@ -156,7 +155,6 @@ _infra/
 │   │   ├── dnsmasq.conf
 │   │   ├── com.loco.infra.plist
 │   │   └── resolver/
-│   │       ├── jorpo.loco
 │   │       └── loco
 │   └── traefik/
 │       ├── traefik.yml      ← Static config
@@ -628,7 +626,7 @@ ping -c 1 concerto.jorpo.loco
 # Should resolve to 10.254.254.254
 
 # Test Traefik dashboard
-open http://traefik.jorpo.loco
+open http://traefik.loco
 ```
 
 ### Step 4: (Already done — see Step 1)
@@ -657,7 +655,6 @@ just kind-create mycluster
 brew services list | grep dnsmasq
 
 # Check resolver files exist
-cat /etc/resolver/jorpo.loco
 cat /etc/resolver/loco
 
 # Test resolution
@@ -677,7 +674,7 @@ docker ps | grep loco-traefik
 just logs
 
 # Check Traefik dashboard
-open http://traefik.jorpo.loco
+open http://traefik.loco
 
 # Verify the container has labels
 docker inspect <container> | jq '.[].Config.Labels'

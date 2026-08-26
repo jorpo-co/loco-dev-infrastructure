@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# scripts/dns.sh — Install, verify, and remove local wildcard DNS for *.jorpo.loco and *.loco
+# scripts/dns.sh — Install, verify, and remove local wildcard DNS for *.loco
 #
 # Uses Homebrew dnsmasq + macOS resolver files + a dedicated loopback alias (10.254.254.254).
 # Config files live in _infra/etc/dns/ and are symlinked to system locations.
@@ -47,7 +47,7 @@ DNSMASQ_CONF_DIR="${BREW_PREFIX}/etc/dnsmasq.d"
 DNSMASQ_CONF_LINK="${DNSMASQ_CONF_DIR}/loco.conf"
 RESOLVER_DIR="/etc/resolver"
 PLIST_TARGET="/Library/LaunchDaemons/${PLIST_LABEL}.plist"
-read -ra TLDS <<< "${DNS_TLDS:-jorpo.loco loco}"
+read -ra TLDS <<< "${DNS_TLDS:-loco}"
 
 # ──────────────────────────────────────────────
 # Helpers
@@ -203,7 +203,7 @@ cmd_install() {
 
   if $all_ok; then
     echo "═══ DNS installation complete ═══"
-    echo "  Any *.jorpo.loco or *.loco domain now resolves to ${LOOPBACK_IP}"
+    echo "  Any *.loco domain now resolves to ${LOOPBACK_IP}"
     echo "  Traefik (on port 80/443 at ${LOOPBACK_IP}) will route traffic."
   else
     echo "═══ DNS installation failed ═══"

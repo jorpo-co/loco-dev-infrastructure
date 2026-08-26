@@ -66,7 +66,7 @@ services:
     image: traefik:v3
     labels:
       - traefik.enable=true
-      - traefik.http.routers.dashboard.rule=Host(`traefik.jorpo.loco`)
+      - traefik.http.routers.dashboard.rule=Host(`traefik.loco`)
       - traefik.http.routers.dashboard.service=api@internal
       - traefik.http.routers.dashboard.entrypoints=web
       - traefik.docker.network=loco

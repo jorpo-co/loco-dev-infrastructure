@@ -84,7 +84,7 @@ the infra Traefik router — allocates ports, writes config, configures containe
 |---|---|
 | Skillrunner not responding | `curl -s http://localhost:9999/health` |
 | DNS not resolving | `cd ~/Projects/_infra && just status` (or `scripts/dns.sh status`) |
-| Traefik not routing | Check http://traefik.jorpo.loco dashboard |
+| Traefik not routing | Check http://traefik.loco dashboard |
 | Kind cluster issues | `{"recipe":"kind-list"}` or `{"script":"/usr/local/bin/kind","args":["get","clusters"]}` |
 
 ## Full reference

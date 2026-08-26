@@ -73,7 +73,7 @@ cmd_up() {
 
   echo ""
   echo "═══ Stack is up ═══"
-  echo "  Traefik dashboard: http://traefik.jorpo.loco"
+  echo "  Traefik dashboard: http://traefik.loco"
   echo "  Registry:          http://registry.loco"
   echo "  Registry UI:       http://registry.loco (web interface)"
   echo "  Registry direct:   http://localhost:5001"

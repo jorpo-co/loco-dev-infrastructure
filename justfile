@@ -55,8 +55,8 @@ registry:
 
 # Open Traefik dashboard in your browser
 traefik:
-    @echo "Opening http://traefik.jorpo.loco..."
-    @open http://traefik.jorpo.loco
+    @echo "Opening http://traefik.loco..."
+    @open http://traefik.loco
 
 # tag and push an image to registry.loco
 registry-push image tag="latest":
@@ -150,7 +150,6 @@ doctor:
     @if docker info &>/dev/null; then echo "  ✓ Docker is running"; else echo "  ✗ Docker is not running"; fi
     @echo ""
     @echo "── DNS ──"
-    @if dscacheutil -q host -a name test.jorpo.loco 2>/dev/null | grep -q "10.254.254.254"; then echo "  ✓ *.jorpo.loco → 10.254.254.254"; else echo "  ✗ *.jorpo.loco not resolving. Run: just setup"; fi
     @if dscacheutil -q host -a name test.loco 2>/dev/null | grep -q "10.254.254.254"; then echo "  ✓ *.loco → 10.254.254.254"; else echo "  ✗ *.loco not resolving. Run: just setup"; fi
     @echo ""
     @echo "── Infrastructure ──"
@@ -159,7 +158,7 @@ doctor:
     done
     @echo ""
     @echo "── Traefik Routing ──"
-    @if curl -s -o /dev/null -w "%{http_code}" http://traefik.jorpo.loco 2>/dev/null | grep -q "200"; then echo "  ✓ Traefik dashboard reachable at http://traefik.jorpo.loco"; else echo "  ⚠ Traefik dashboard not reachable (may need DNS setup)"; fi
+    @if curl -s -o /dev/null -w "%{http_code}" http://traefik.loco 2>/dev/null | grep -q "200"; then echo "  ✓ Traefik dashboard reachable at http://traefik.loco"; else echo "  ⚠ Traefik dashboard not reachable (may need DNS setup)"; fi
     @echo ""
     @echo "── /etc/hosts conflicts ──"
     @if grep -q "jorpo.loco" /etc/hosts 2>/dev/null; then echo "  ⚠ /etc/hosts contains jorpo.loco entries — may conflict with dnsmasq"; grep "jorpo.loco" /etc/hosts 2>/dev/null | sed 's/^/    /'; else echo "  ✓ No jorpo.loco entries in /etc/hosts"; fi
@@ -180,7 +179,7 @@ env:
     @echo "  Port allocs:  {{ PROJECT_DIR }}/var/port-allocations.json"
     @echo "  Skills:       {{ PROJECT_DIR }}/skills/"
     @echo ""
-    @echo "  DNS:          *.jorpo.loco, *.loco → 10.254.254.254"
-    @echo "  Traefik:      http://traefik.jorpo.loco"
+    @echo "  DNS:          *.loco → 10.254.254.254"
+    @echo "  Traefik:      http://traefik.loco"
     @echo "  Registry:     http://registry.loco / localhost:5001"
     @echo "  Skillrunner:  http://localhost:9999"
