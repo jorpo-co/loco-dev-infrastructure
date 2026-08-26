@@ -6,7 +6,7 @@ ENV DOCKER_HOST=unix:///var/run/docker.sock
 ENV PYTHONPATH=/
 
 # Install tooling
-RUN apk add --no-cache python3 curl bash py3-yaml
+RUN apk add --no-cache python3 curl bash py3-yaml just
 
 # Install kind
 ARG KIND_VERSION=v0.27.0

@@ -211,6 +211,7 @@ def get_parsed_projects():
             "type": "kind" if kind else "compose",
             "project_dir": project_dir,
             "status": "unknown",
+            "url": ("https" if ssl_mode != "none" else "http") + "://" + name + domain,
         }
         projects[name] = p
 

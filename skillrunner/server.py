@@ -95,7 +95,7 @@ HTML_DASHBOARD = """\
         <tr>
           <th>Project</th>
           <th>Type</th>
-          <th>Domain</th>
+          <th>URL</th>
           <th>Port</th>
           <th>TLS</th>
           <th>Status</th>
@@ -168,7 +168,7 @@ function renderProjects(projects) {
     return `<tr>
       <td><strong>${nameEnc}</strong></td>
       <td><span class="badge-type type-${esc(p.type)}">${esc(p.type)}</span></td>
-      <td>${esc(p.domain)}</td>
+      <td><a href="${esc(p.url)}" target="_blank" style="color:var(--blue);text-decoration:none">${esc(p.url)}</a></td>
       <td>${portLabel}</td>
       <td><span class="ssl-label ${sslClass}">${sslLabel}</span></td>
       <td><span class="status-dot ${statusClass}">${statusLabel}</span></td>
