@@ -14,8 +14,11 @@ join the `loco` network.
 
 ```bash
 curl -s -X POST http://localhost:9999/run \
-  -d '{"recipe":"<recipe>","args":["<name>","<port>"]}'
+  -d '{"recipe":"<recipe>","args":["<name>","<domain>","<port>","<path>"]}'
 ```
+
+The project path (e.g. `/projects/compose/myapp`) is embedded as a comment in the generated
+Traefik config. Pass it as the 4th argument, or pass `""` (empty string) to omit it.
 
 Two SSL modes are available, each using a different template:
 
@@ -72,14 +75,17 @@ The templates use `{{name}}`, `{{domain}}`, `{{host}}`, `{{http_port}}`, `{{tls_
 
 ## Determining the project directory
 
-The scaffold scripts infer the category from the agent's working directory (inside `/projects`).
-The agent must ensure CWD is set correctly, or pass `--project-dir` via the underlying script.
+The scaffold recipe accepts a 4th positional argument for the project path. The agent should
+resolve the project directory from the user's prompt and pass it here.
 
 | User says | Resolution |
 |---|---|
 | "create a compose project in this folder" | Use CWD → derives name + category from path |
 | "make a new project called 'myapp' in ./something/" | Resolve to `/projects/<category>/myapp/` |
 | "make me a project called 'concerto'" | Uses CWD to infer category → `/projects/<category>/concerto/` |
+
+The path is written into the Traefik config as a comment (`# project_path: <path>`) for
+traceability. If no path is provided, the comment is left empty.
 
 ## What the project's compose.yaml needs
 

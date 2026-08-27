@@ -83,45 +83,48 @@ registry-clean:
   @{{ SCRIPTS_DIR }}/registry.sh clean
 
 # register a project with Traefik (HTTP only, no SSL)
-scaffold-http-only name domain http_port="80":
-  @{{ SCRIPTS_DIR }}/scaffold.sh register \
-    --name "{{ name }}" \
-    --domain "{{ domain }}" \
-    --http-port "{{ http_port }}"
-
-# register a project with Traefik (terminate SSL at Traefik)
-scaffold-terminate name domain http_port="80":
+scaffold-http-only name domain http_port="80" path="":
   @{{ SCRIPTS_DIR }}/scaffold.sh register \
     --name "{{ name }}" \
     --domain "{{ domain }}" \
     --http-port "{{ http_port }}" \
+    --path "{{ path }}"
+
+# register a project with Traefik (terminate SSL at Traefik)
+scaffold-terminate name domain http_port="80" path="":
+  @{{ SCRIPTS_DIR }}/scaffold.sh register \
+    --name "{{ name }}" \
+    --domain "{{ domain }}" \
+    --http-port "{{ http_port }}" \
+    --path "{{ path }}" \
     --ssl terminate
 
 # register a kind cluster with Traefik (passthrough SSL, host.docker.internal)
-scaffold-passthrough name domain http_port tls_port:
+scaffold-passthrough name domain http_port tls_port path="":
   @{{ SCRIPTS_DIR }}/scaffold.sh register \
     --name "{{ name }}" \
     --domain "{{ domain }}" \
     --host host.docker.internal \
     --http-port "{{ http_port }}" \
     --tls-port "{{ tls_port }}" \
+    --path "{{ path }}" \
     --ssl passthrough
 
 # scaffold a kind cluster project (kind-config.yaml)
-scaffold-kind name:
-  @{{ SCRIPTS_DIR }}/kind.sh scaffold "{{ name }}"
+scaffold-kind name project_dir="":
+  @{{ SCRIPTS_DIR }}/kind.sh --project-dir "{{ project_dir }}" scaffold "{{ name }}"
 
 # create a kind cluster with port allocation + Traefik route registration
-kind-create name:
-  @{{ SCRIPTS_DIR }}/kind.sh create "{{ name }}"
+kind-create name project_dir="":
+  @{{ SCRIPTS_DIR }}/kind.sh --project-dir "{{ project_dir }}" create "{{ name }}"
 
 # delete a kind cluster and free its ports
 kind-delete name:
   @{{ SCRIPTS_DIR }}/kind.sh delete "{{ name }}"
 
 # register an existing kind cluster with infra (ports + mirror + Traefik route)
-kind-import name:
-  @{{ SCRIPTS_DIR }}/kind.sh import "{{ name }}"
+kind-import name project_dir="":
+  @{{ SCRIPTS_DIR }}/kind.sh --project-dir "{{ project_dir }}" import "{{ name }}"
 
 # initialize mkcert root CA (runs on host, stores CA in etc/certs/ca/)
 certs-init:

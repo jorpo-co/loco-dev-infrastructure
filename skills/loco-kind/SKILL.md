@@ -13,10 +13,10 @@ Kind clusters use the **Traefik file provider** for routing, routing via `host.d
 
 ```bash
 # Create a cluster (allocates ports, creates cluster, registers Traefik route, configures mirror)
-curl -s -X POST http://localhost:9999/run -d '{"recipe":"kind-create","args":["<name>"]}'
+curl -s -X POST http://localhost:9999/run -d '{"recipe":"kind-create","args":["<name>","<project_dir>"]}'
 
 # Import an existing cluster (ports, mirror, Traefik route — no cluster creation)
-curl -s -X POST http://localhost:9999/run -d '{"recipe":"kind-import","args":["<name>"]}'
+curl -s -X POST http://localhost:9999/run -d '{"recipe":"kind-import","args":["<name>","<project_dir>"]}'
 
 # Delete a cluster (frees ports, removes Traefik config)
 curl -s -X POST http://localhost:9999/run -d '{"recipe":"kind-delete","args":["<name>"]}'
@@ -26,20 +26,23 @@ curl -s -X POST http://localhost:9999/run -d '{"recipe":"kind-list"}'
 curl -s -X POST http://localhost:9999/run -d '{"recipe":"kind-ports"}'
 
 # Scaffold kind-config.yaml for a new project
-curl -s -X POST http://localhost:9999/run -d '{"recipe":"scaffold-kind","args":["<name>"]}'
+curl -s -X POST http://localhost:9999/run -d '{"recipe":"scaffold-kind","args":["<name>","<project_dir>"]}'
 ```
+
+The project directory is embedded as a `# project_path:` comment in the generated Traefik config.
+Pass it as the 2nd argument (e.g. `/projects/kind/mycluster`), or pass `""` to omit it.
 
 ## Cluster lifecycle
 
 ### 1. Scaffold (optional)
 Generates `kind-config.yaml` at the inferred project path with placeholder ports:
 ```bash
-curl -s -X POST http://localhost:9999/run -d '{"recipe":"scaffold-kind","args":["mycluster"]}'
+curl -s -X POST http://localhost:9999/run -d '{"recipe":"scaffold-kind","args":["mycluster","/projects/kind/mycluster"]}'
 ```
 
 ### 2. Create (one-step: cluster + routing)
 ```bash
-curl -s -X POST http://localhost:9999/run -d '{"recipe":"kind-create","args":["mycluster"]}'
+curl -s -X POST http://localhost:9999/run -d '{"recipe":"kind-create","args":["mycluster","/projects/kind/mycluster"]}'
 ```
 This single command:
 - Allocates HTTP/TLS ports
@@ -49,7 +52,7 @@ This single command:
 
 ### Import (for existing clusters)
 ```bash
-curl -s -X POST http://localhost:9999/run -d '{"recipe":"kind-import","args":["mycluster"]}'
+curl -s -X POST http://localhost:9999/run -d '{"recipe":"kind-import","args":["mycluster","/projects/kind/mycluster"]}'
 ```
 Same as create but does **not** create the cluster — registers an existing one.
 

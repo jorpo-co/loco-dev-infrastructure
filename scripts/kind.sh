@@ -150,6 +150,7 @@ _register_traefik_route() {
     --host "host.docker.internal" \
     --http-port "$http_port" \
     --tls-port "$tls_port" \
+    --path "$project_dir" \
     --ssl "passthrough"
 }
 

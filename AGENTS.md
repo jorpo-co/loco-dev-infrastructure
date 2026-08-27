@@ -58,12 +58,13 @@ Certs are stored in `etc/certs/<name>.{crt,key}` and registered with Traefik
 via `etc/traefik/configs/_certs-<name>.yml`.
 
 ```bash
-curl -s -X POST http://localhost:9999/run -d '{"recipe":"scaffold-http-only","args":["myapp","3000"]}'
-curl -s -X POST http://localhost:9999/run -d '{"recipe":"scaffold-terminate","args":["blog","80"]}'
+curl -s -X POST http://localhost:9999/run -d '{"recipe":"scaffold-http-only","args":["myapp",".loco","3000","/projects/compose/myapp"]}'
+curl -s -X POST http://localhost:9999/run -d '{"recipe":"scaffold-terminate","args":["blog",".loco","80","/projects/sites/blog"]}'
 ```
 
-The agent resolves the project directory from the user's prompt and ensures CWD is set
-appropriately for category inference.
+The 4th argument is the project directory path — it's written as a `# project_path:` comment
+in the generated Traefik config for traceability. The agent resolves the project directory
+from the user's prompt and passes it here.
 
 ### loco-kind — Kind cluster management
 
@@ -71,17 +72,15 @@ Kind clusters also use the Traefik file provider, but route via `host.docker.int
 (since they're on a separate bridge network, not `loco`).
 
 ```bash
-curl -s -X POST http://localhost:9999/run -d '{"recipe":"scaffold-kind","args":["mycluster"]}'
-curl -s -X POST http://localhost:9999/run -d '{"recipe":"kind-create","args":["mycluster"]}'
-curl -s -X POST http://localhost:9999/run -d '{"recipe":"kind-import","args":["mycluster"]}'
+curl -s -X POST http://localhost:9999/run -d '{"recipe":"scaffold-kind","args":["mycluster","/projects/kind/mycluster"]}'
+curl -s -X POST http://localhost:9999/run -d '{"recipe":"kind-create","args":["mycluster","/projects/kind/mycluster"]}'
+curl -s -X POST http://localhost:9999/run -d '{"recipe":"kind-import","args":["mycluster","/projects/kind/mycluster"]}'
 curl -s -X POST http://localhost:9999/run -d '{"recipe":"kind-delete","args":["mycluster"]}'
 curl -s -X POST http://localhost:9999/run -d '{"recipe":"kind-list"}'
 ```
 
-`scaffold-kind` generates `kind-config.yaml` for a new cluster project. Ports are placeholders — allocated at creation time.
-
-`kind-import` registers an **existing** cluster (created manually or by other tools) with
-the infra Traefik router — allocates ports, writes config, configures containerd mirror.
+The 2nd argument is the project directory path — it's written as a `# project_path:` comment
+in the generated Traefik config. Pass `""` to omit it. `kind-delete` only needs the cluster name.
 
 ## Troubleshooting
 
