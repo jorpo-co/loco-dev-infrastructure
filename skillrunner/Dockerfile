@@ -3,7 +3,6 @@ FROM docker:dind
 ENV INFRA_DIR=/infra
 ENV PROJECTS_DIR=/projects
 ENV DOCKER_HOST=unix:///var/run/docker.sock
-ENV PYTHONPATH=/
 
 # Install tooling
 RUN apk add --no-cache python3 curl bash py3-yaml just
@@ -27,6 +26,8 @@ RUN curl -fsSLo /usr/local/bin/mkcert \
     chmod +x /usr/local/bin/mkcert
 
 # HTTP API server + project module
+# NOTE: At runtime, the compose.yml copies these from /infra/skillrunner/ to /
+# so the volume-mounted copies take precedence over the baked-in ones.
 COPY server.py projects.py /
 
 EXPOSE 8080

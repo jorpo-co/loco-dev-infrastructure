@@ -227,6 +227,39 @@ def _to_host_path(container_path):
     return container_path
 
 
+def _get_compose_container_names(compose_dir):
+    """Parse a compose file and return the set of expected container names.
+
+    Handles both explicit container_name and default
+    {project_name}-{service_name}-{index} naming.
+    """
+    for cf in ("compose.yaml", "compose.yml", "docker-compose.yaml", "docker-compose.yml"):
+        fpath = os.path.join(compose_dir, cf)
+        if os.path.isfile(fpath):
+            try:
+                import yaml
+                with open(fpath) as f:
+                    config = yaml.safe_load(f)
+            except Exception:
+                return set()
+
+            services = config.get("services", {})
+            if not services:
+                return set()
+
+            names = set()
+            project_name = os.path.basename(compose_dir)
+            for svc_name, svc_config in services.items():
+                cn = svc_config.get("container_name")
+                if cn:
+                    names.add(cn)
+                else:
+                    # Docker Compose v2 default: {project}-{service}-{index}
+                    names.add(f"{project_name}-{svc_name}-1")
+            return names
+    return set()
+
+
 def resolve_status(projects):
     """Add running status to each project dict (mutates in place)."""
     # Get running kind clusters
@@ -235,7 +268,7 @@ def resolve_status(projects):
     if rc == 0:
         kind_clusters = set(out.splitlines())
 
-    # Get running docker containers on loco network
+    # Get all running container names on loco network
     compose_running = set()
     rc, out, _ = _run(["docker", "ps", "--filter", "network=loco",
                         "--format", "{{.Names}}"])
@@ -247,7 +280,12 @@ def resolve_status(projects):
         if p["type"] == "kind":
             p["status"] = "running" if p["name"] in kind_clusters else "stopped"
         else:  # compose
-            p["status"] = "running" if p["name"] in compose_running else "stopped"
+            p["status"] = "stopped"
+            compose_dir = p.get("project_dir", "") or _find_compose_dir(p["name"])
+            if compose_dir:
+                container_names = _get_compose_container_names(compose_dir)
+                if container_names and any(cn in compose_running for cn in container_names):
+                    p["status"] = "running"
 
 
 def action_project(name, action):
@@ -326,6 +364,13 @@ def _action_compose(name, project_dir, action):
         ok1, msg1 = _action_compose(name, project_dir, "stop")
         ok2, msg2 = _action_compose(name, project_dir, "start")
         return ok2, f"Restarted: {msg1}; {msg2}"
+    elif action == "build":
+        return _run_and_report(
+            ["docker", "compose", "--project-directory", host_dir,
+             "-f", compose_file, "build"],
+            cwd=compose_dir,
+            timeout=300,
+        )
     return False, f"Unknown action: {action}"
 
 

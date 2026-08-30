@@ -1,5 +1,8 @@
 from http.server import HTTPServer, BaseHTTPRequestHandler
 import json, subprocess, os, signal, sys
+
+# Ensure we import projects.py from the mounted volume, not the baked-in /projects.py
+sys.path.insert(0, "/infra/skillrunner")
 from projects import get_parsed_projects, resolve_status, action_project
 
 HOST = "0.0.0.0"
@@ -65,6 +68,8 @@ HTML_DASHBOARD = """\
   .btn-stop:hover:not(:disabled) { background: #da3633; color: #fff; }
   .btn-restart { border-color: var(--border); }
   .btn-restart:hover:not(:disabled) { background: #21262d; }
+  .btn-build { border-color: var(--blue); color: var(--blue); }
+  .btn-build:hover:not(:disabled) { background: var(--blue); color: #fff; }
   .empty { text-align: center; padding: 40px 14px; color: var(--dim); }
   .empty p { font-size: 15px; }
   .toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
@@ -176,6 +181,7 @@ function renderProjects(projects) {
         <button class="btn btn-start"  data-name="${nameEnc}" data-action="start"  ${isRunning ? "disabled" : ""}>Start</button>
         <button class="btn btn-stop"   data-name="${nameEnc}" data-action="stop"  ${isStopped ? "disabled" : ""}>Stop</button>
         <button class="btn btn-restart" data-name="${nameEnc}" data-action="restart">Restart</button>
+        <button class="btn btn-build" data-name="${nameEnc}" data-action="build">Build</button>
       </td>
     </tr>`;
   }).join("");
@@ -250,7 +256,7 @@ class RunHandler(BaseHTTPRequestHandler):
 
     def do_POST(self):
         # ── Project actions ──
-        m = __import__("re").match(r"^/api/projects/([^/]+)/(start|stop|restart)$", self.path)
+        m = __import__("re").match(r"^/api/projects/([^/]+)/(start|stop|restart|build)$", self.path)
         if m:
             name, action = m.group(1), m.group(2)
             ok, msg = action_project(name, action)
@@ -312,7 +318,7 @@ def main():
     print(f"  INFRA_DIR={INFRA_DIR}  PROJECTS_DIR={PROJECTS_DIR}", flush=True)
     print(f"  Dashboard: GET  /ui", flush=True)
     print(f"  Projects:  GET  /api/projects", flush=True)
-    print(f"  Actions:   POST /api/projects/<name>/{'{start|stop|restart}'}", flush=True)
+    print(f"  Actions:   POST /api/projects/<name>/{'{start|stop|restart|build}'}", flush=True)
     print(f"  Recipes:   POST /run  {{\"recipe\": \"...\", \"args\": [...]}}", flush=True)
     print(f"  Scripts:   POST /run  {{\"script\": \"/infra/scripts/...\", \"args\": [...]}}", flush=True)
     try:
